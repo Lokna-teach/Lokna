@@ -18,7 +18,7 @@ const sjekklisteValg = [
   "Teams",
   "Fagbok",
   "Spurt en klassekompis",
-  "Har lett i klasserommet",
+  "Har sett i hele klasserommet",
 ];
 
 const blokkerteNavnOrd = [
@@ -111,10 +111,28 @@ function formatMonthLabel(key) {
   });
 }
 
+async function readApiResponse(response, fallbackMessage) {
+  const text = await response.text();
+  let data = {};
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(fallbackMessage);
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(data.message || fallbackMessage);
+  }
+
+  return data;
+}
+
 async function hentElevKoFraApi() {
   const response = await fetch("/api/queue", { cache: "no-store" });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || "Kunne ikke hente køen.");
+  const data = await readApiResponse(response, "Køserveren svarte ikke riktig. Sjekk Vercel Functions-loggen.");
   return Array.isArray(data.queue) ? data.queue : [];
 }
 
@@ -123,8 +141,10 @@ async function hentLaererKoFraApi() {
     cache: "no-store",
     headers: { Authorization: laererAuthHeader() },
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || "Kunne ikke hente lærerkøen.");
+  const data = await readApiResponse(
+    response,
+    "Lærerkøen svarte ikke riktig. Sjekk at API-filene er deployet i Vercel."
+  );
   return Array.isArray(data.queue) ? data.queue : [];
 }
 
@@ -642,15 +662,11 @@ export default function App() {
 
   async function leggTilIKo(innslag) {
     const response = await fetch("/api/queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(innslag),
-    });
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || "Kunne ikke legge deg i kø.");
-    }
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(innslag),
+  });
+    const data = await readApiResponse(response, "Kunne ikke legge deg i kø.");
 
     const ko = await hentElevKoFraApi();
     setElevKo(ko);
@@ -660,46 +676,44 @@ export default function App() {
   }
 
   async function merkSomHjulpet(id) {
-    const response = await fetch(`/api/teacher/queue/${encodeURIComponent(id)}`, {
-      method: "POST",
-      headers: { Authorization: laererAuthHeader() },
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch(`/api/teacher/queue/${encodeURIComponent(id)}`, {
+        method: "POST",
+        headers: { Authorization: laererAuthHeader() },
+      });
+      await readApiResponse(response, "Kunne ikke markere som hjulpet. Sjekk Vercel Functions-loggen.");
 
-    if (!response.ok) {
-      setLaererKoFeil(data.message || "Kunne ikke markere som hjulpet.");
-      return;
+      const [nyElevKo, nyLaererKo] = await Promise.all([hentElevKoFraApi(), hentLaererKoFraApi()]);
+      setElevKo(nyElevKo);
+      setLaererKo(nyLaererKo);
+      setKoFeil("");
+      setLaererKoFeil("");
+      setSistOppdatert(new Date());
+    } catch (error) {
+      setLaererKoFeil(error.message || "Kunne ikke markere som hjulpet.");
     }
-
-    const [nyElevKo, nyLaererKo] = await Promise.all([hentElevKoFraApi(), hentLaererKoFraApi()]);
-    setElevKo(nyElevKo);
-    setLaererKo(nyLaererKo);
-    setKoFeil("");
-    setLaererKoFeil("");
-    setSistOppdatert(new Date());
   }
 
   async function tilbakestillKo() {
     const bekreftet = window.confirm("Er du sikker på at du vil tilbakestille den aktive køen?");
     if (!bekreftet) return;
 
-    const response = await fetch("/api/teacher/queue", {
-      method: "DELETE",
-      headers: { Authorization: laererAuthHeader() },
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch("/api/teacher/queue", {
+        method: "DELETE",
+        headers: { Authorization: laererAuthHeader() },
+      });
+      await readApiResponse(response, "Kunne ikke tilbakestille køen. Sjekk Vercel Functions-loggen.");
 
-    if (!response.ok) {
-      setLaererKoFeil(data.message || "Kunne ikke tilbakestille køen.");
-      return;
+      const [nyElevKo, nyLaererKo] = await Promise.all([hentElevKoFraApi(), hentLaererKoFraApi()]);
+      setElevKo(nyElevKo);
+      setLaererKo(nyLaererKo);
+      setKoFeil("");
+      setLaererKoFeil("");
+      setSistOppdatert(new Date());
+    } catch (error) {
+      setLaererKoFeil(error.message || "Kunne ikke tilbakestille køen.");
     }
-
-    const [nyElevKo, nyLaererKo] = await Promise.all([hentElevKoFraApi(), hentLaererKoFraApi()]);
-    setElevKo(nyElevKo);
-    setLaererKo(nyLaererKo);
-    setKoFeil("");
-    setLaererKoFeil("");
-    setSistOppdatert(new Date());
   }
 
   function loggUt() {
