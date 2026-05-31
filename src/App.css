@@ -413,8 +413,17 @@ h2 {
   background: var(--gray-300);
 }
 
+.active-queue-header {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
 .teacher-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -686,6 +695,7 @@ h2 {
 
   .hero,
   .queue-panel-header,
+  .active-queue-header,
   .teacher-queue-item {
     align-items: stretch;
     flex-direction: column;

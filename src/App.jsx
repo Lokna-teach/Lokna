@@ -544,6 +544,64 @@ function BarRow({ label, value, max }) {
   );
 }
 
+function ActiveQueueSection({ aktivKo, koFeil, onMerkHjulpet, onTilbakestillKo, onOpenStatistikk, sistOppdatert }) {
+  return (
+    <section className="card">
+      <div className="active-queue-header">
+        <div className="section-heading">
+          <div className="section-icon">
+            <ClipboardCheck size={22} />
+          </div>
+          <div>
+            <p className="portal-eyebrow">Lærer</p>
+            <h1>Aktiv kø</h1>
+            <p className="muted-text">{aktivKo.length} i kø</p>
+            {sistOppdatert && (
+              <p className="queue-updated">Sist oppdatert {sistOppdatert.toLocaleTimeString("nb-NO")}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="teacher-actions">
+          <button type="button" className="ghost-button" onClick={onOpenStatistikk}>
+            <BarChart3 size={18} />
+            Statistikk
+          </button>
+          <button type="button" className="danger-button" onClick={onTilbakestillKo}>
+            <RotateCcw size={18} />
+            Tilbakestill kø
+          </button>
+        </div>
+      </div>
+
+      {koFeil ? (
+        <div className="queue-error">{koFeil}</div>
+      ) : aktivKo.length === 0 ? (
+        <div className="empty-queue">Ingen venter på hjelp.</div>
+      ) : (
+        <div className="teacher-queue-list">
+          {aktivKo.map((innslag, index) => (
+            <article className="teacher-queue-item" key={innslag.id}>
+              <div>
+                <div className="teacher-item-title">
+                  <span>{index + 1}</span>
+                  <h3>{innslag.navn}</h3>
+                </div>
+                <p>{innslag.gjelder}</p>
+                <p className="muted-text">Sjekket: {innslag.sjekket.join(", ")}</p>
+              </div>
+              <label className="resolve-checkbox">
+                <input type="checkbox" onChange={() => onMerkHjulpet(innslag.id)} />
+                <span>Hjulpet</span>
+              </label>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function LaererPage({
   ko,
   koFeil,
@@ -558,89 +616,43 @@ function LaererPage({
 
   return (
     <section className="page">
-      <header className="hero">
-        <div>
-          <p className="portal-eyebrow">Lærer</p>
-          <h1>Hjelpekø</h1>
-          <p>Her ser du detaljer for hver elev og kan fjerne dem fra køen når de er hjulpet.</p>
-        </div>
-        <div className="hero-stat">
-          <ListChecks size={22} />
-          <span>{aktivKo.length}</span>
-          <strong>aktive</strong>
-        </div>
-      </header>
-
-      <div className="teacher-tabs" aria-label="Lærervalg">
-        <button
-          type="button"
-          className={!viserStatistikk ? "active" : ""}
-          onClick={() => onByttLaererVisning("ko")}
-        >
-          <ListChecks size={18} />
-          Aktiv kø
-        </button>
-        <button
-          type="button"
-          className={viserStatistikk ? "active" : ""}
-          onClick={() => onByttLaererVisning("statistikk")}
-        >
-          <BarChart3 size={18} />
-          Statistikk
-        </button>
-      </div>
-
       {viserStatistikk ? (
-        <LaererStatus ko={ko} />
-      ) : (
         <>
-          <div className="teacher-actions">
-            <button type="button" className="danger-button" onClick={onTilbakestillKo}>
-              <RotateCcw size={18} />
-              Tilbakestill kø
+          <div className="teacher-tabs" aria-label="Lærervalg">
+            <button type="button" onClick={() => onByttLaererVisning("ko")}>
+              <ListChecks size={18} />
+              Aktiv kø
+            </button>
+            <button type="button" className="active" onClick={() => onByttLaererVisning("statistikk")}>
+              <BarChart3 size={18} />
+              Statistikk
             </button>
           </div>
 
-          <section className="card">
-            <div className="section-heading">
-              <div className="section-icon">
-                <ClipboardCheck size={22} />
-              </div>
-              <div>
-                <p className="portal-eyebrow">Aktiv kø</p>
-                <h2>{aktivKo.length} i kø</h2>
-                {sistOppdatert && (
-                  <p className="queue-updated">Sist oppdatert {sistOppdatert.toLocaleTimeString("nb-NO")}</p>
-                )}
-              </div>
+          <header className="hero">
+            <div>
+              <p className="portal-eyebrow">Lærer</p>
+              <h1>Statistikk</h1>
+              <p>Oversikt over hjulpetid, trykk i timen og anonymisert historikk.</p>
             </div>
+            <div className="hero-stat">
+              <ListChecks size={22} />
+              <span>{ko.filter((innslag) => innslag.hjulpet).length}</span>
+              <strong>hjulpet</strong>
+            </div>
+          </header>
 
-            {koFeil ? (
-              <div className="queue-error">{koFeil}</div>
-            ) : aktivKo.length === 0 ? (
-              <div className="empty-queue">Ingen venter på hjelp.</div>
-            ) : (
-              <div className="teacher-queue-list">
-                {aktivKo.map((innslag, index) => (
-                  <article className="teacher-queue-item" key={innslag.id}>
-                    <div>
-                      <div className="teacher-item-title">
-                        <span>{index + 1}</span>
-                        <h3>{innslag.navn}</h3>
-                      </div>
-                      <p>{innslag.gjelder}</p>
-                      <p className="muted-text">Sjekket: {innslag.sjekket.join(", ")}</p>
-                    </div>
-                    <label className="resolve-checkbox">
-                      <input type="checkbox" onChange={() => onMerkHjulpet(innslag.id)} />
-                      <span>Hjulpet</span>
-                    </label>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+          <LaererStatus ko={ko} />
         </>
+      ) : (
+        <ActiveQueueSection
+          aktivKo={aktivKo}
+          koFeil={koFeil}
+          sistOppdatert={sistOppdatert}
+          onMerkHjulpet={onMerkHjulpet}
+          onTilbakestillKo={onTilbakestillKo}
+          onOpenStatistikk={() => onByttLaererVisning("statistikk")}
+        />
       )}
     </section>
   );
