@@ -16,7 +16,28 @@ const checklistValues = new Set([
   "Teams",
   "Fagbok",
   "Spurt en klassekompis",
+  "Har lett i klasserommet",
 ]);
+const blockedNameWords = [
+  "admin",
+  "anonymous",
+  "anonym",
+  "bitch",
+  "dritt",
+  "faen",
+  "fuck",
+  "hitler",
+  "hore",
+  "idiot",
+  "kuk",
+  "nazi",
+  "neger",
+  "penis",
+  "rasist",
+  "sex",
+  "test",
+  "tiss",
+];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -43,6 +64,38 @@ function normalizeName(navn) {
     .trim()
     .replace(/\s+/g, " ")
     .toLowerCase();
+}
+
+function normalizeForFilter(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9æøå]/g, "");
+}
+
+function validateStudentName(navn) {
+  const trimmed = String(navn || "").trim();
+  const normalized = normalizeForFilter(trimmed);
+
+  if (trimmed.length < 2) return "Skriv inn et ekte navn.";
+  if (trimmed.length > 20) return "Navnet kan maks være 20 bokstaver.";
+  if (!/^[a-zA-ZæøåÆØÅ ]+$/.test(trimmed)) {
+    return "Bruk kun bokstaver i navnet.";
+  }
+  if (/(.)\1{3,}/.test(normalized)) return "Bruk et ekte navn.";
+  if (blockedNameWords.some((word) => normalized.includes(word))) {
+    return "Bruk et ordentlig navn.";
+  }
+
+  return "";
+}
+
+function countWords(value) {
+  return String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
 }
 
 function hasActiveDuplicate(navn) {
@@ -85,8 +138,17 @@ function validateStudentEntry(body) {
     ? body.sjekket.filter((value) => checklistValues.has(value))
     : [];
 
-  if (!navn || !gjelder || sjekket.length === 0) {
-    return { ok: false, message: "Navn, hva det gjelder og minst ett sjekkpunkt må fylles ut." };
+  const nameError = validateStudentName(navn);
+  if (nameError) {
+    return { ok: false, message: nameError };
+  }
+
+  if (countWords(gjelder) < 7) {
+    return { ok: false, message: "Skriv minst 7 ord om hva du trenger hjelp til." };
+  }
+
+  if (sjekket.length !== checklistValues.size) {
+    return { ok: false, message: "Alle punktene i sjekket først må krysses av." };
   }
 
   return { ok: true, entry: { navn, gjelder, sjekket } };
@@ -132,6 +194,17 @@ createServer(async (request, response) => {
       }
 
       sendJson(response, 200, { queue });
+      return;
+    }
+
+    if (request.method === "DELETE" && url.pathname === "/api/teacher/queue") {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lærer." });
+        return;
+      }
+
+      queue = queue.filter((entry) => entry.hjulpet);
+      sendJson(response, 200, { ok: true, queue });
       return;
     }
 
