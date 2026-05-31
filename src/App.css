@@ -384,6 +384,30 @@ h2 {
   box-shadow: 2px 2px 0 var(--ink);
 }
 
+.teacher-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.danger-button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 3px solid var(--ink);
+  border-radius: 18px;
+  background: var(--gray-300);
+  color: var(--ink);
+  font-weight: 950;
+  box-shadow: var(--small-shadow);
+}
+
+.danger-button:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 var(--ink);
+}
+
 .queue-panel-header {
   display: flex;
   gap: 16px;

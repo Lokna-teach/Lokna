@@ -5,6 +5,7 @@ import {
   ListChecks,
   LockKeyhole,
   LogOut,
+  RotateCcw,
   Users,
 } from "lucide-react";
 
@@ -17,10 +18,64 @@ const sjekklisteValg = [
   "Teams",
   "Fagbok",
   "Spurt en klassekompis",
+  "Har lett i klasserommet",
+];
+
+const blokkerteNavnOrd = [
+  "admin",
+  "anonymous",
+  "anonym",
+  "bitch",
+  "dritt",
+  "faen",
+  "fuck",
+  "hitler",
+  "hore",
+  "idiot",
+  "kuk",
+  "nazi",
+  "neger",
+  "penis",
+  "rasist",
+  "sex",
+  "test",
+  "tiss",
 ];
 
 function hasValue(value) {
   return String(value ?? "").trim() !== "";
+}
+
+function normalizeForFilter(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9æøå]/g, "");
+}
+
+function validateStudentName(navn) {
+  const trimmed = String(navn || "").trim();
+  const normalized = normalizeForFilter(trimmed);
+
+  if (trimmed.length < 2) return "Skriv inn et ekte navn.";
+  if (trimmed.length > 20) return "Navnet kan maks være 20 bokstaver.";
+  if (!/^[a-zA-ZæøåÆØÅ ]+$/.test(trimmed)) {
+    return "Bruk kun bokstaver i navnet.";
+  }
+  if (/(.)\1{3,}/.test(normalized)) return "Bruk et ekte navn.";
+  if (blokkerteNavnOrd.some((ord) => normalized.includes(ord))) {
+    return "Bruk et ordentlig navn.";
+  }
+
+  return "";
+}
+
+function countWords(value) {
+  return String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
 }
 
 function laererAuthHeader() {
@@ -40,6 +95,20 @@ function getVentetidMinutter(innslag) {
 
 function formatDato(value) {
   return value ? new Date(value).toLocaleDateString("nb-NO") : "-";
+}
+
+function formatMonthKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(key) {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("nb-NO", {
+    month: "short",
+    year: "numeric",
+  });
 }
 
 async function hentElevKoFraApi() {
@@ -158,8 +227,19 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
   async function handleSubmit(event) {
     event.preventDefault();
 
-    if (!hasValue(navn) || !hasValue(gjelder) || sjekket.length === 0) {
-      setMelding("Fyll inn navn, hva det gjelder, og kryss av minst ett sted du har sjekket.");
+    const navnFeil = validateStudentName(navn);
+    if (navnFeil) {
+      setMelding(navnFeil);
+      return;
+    }
+
+    if (countWords(gjelder) < 7) {
+      setMelding("Skriv minst 7 ord om hva du trenger hjelp til.");
+      return;
+    }
+
+    if (sjekket.length !== sjekklisteValg.length) {
+      setMelding("Kryss av alle punktene i sjekket først før du legger deg i kø.");
       return;
     }
 
@@ -217,6 +297,7 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
             <label className="field">
               <span>Navn</span>
               <input
+                maxLength={20}
                 value={navn}
                 onChange={(event) => {
                   setNavn(event.target.value);
@@ -234,7 +315,7 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
                   setGjelder(event.target.value);
                   setMelding("");
                 }}
-                placeholder="Forklar kort hva du står fast på"
+                placeholder="Forklar med minst 7 ord hva du står fast på"
                 rows={4}
               />
             </label>
@@ -332,11 +413,16 @@ function LaererStatus({ ko }) {
     (beste, item) => (item.antall > beste.antall ? item : beste),
     { time: null, antall: 0 }
   );
-  const sjekketStatistikk = sjekklisteValg.map((valg) => ({
-    valg,
-    antall: hjulpne.filter((innslag) => innslag.sjekket?.includes(valg)).length,
-  }));
-  const maksSjekketAntall = Math.max(1, ...sjekketStatistikk.map((item) => item.antall));
+  const maanedsStatistikk = Object.entries(
+    hjulpne.reduce((statistikk, innslag) => {
+      const key = formatMonthKey(innslag.hjulpetTid);
+      if (!key) return statistikk;
+      return { ...statistikk, [key]: (statistikk[key] || 0) + 1 };
+    }, {})
+  )
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, antall]) => ({ key, label: formatMonthLabel(key), antall }));
+  const maksMaanedAntall = Math.max(1, ...maanedsStatistikk.map((item) => item.antall));
   const sisteHjulpet = [...hjulpne]
     .sort((a, b) => new Date(b.hjulpetTid).getTime() - new Date(a.hjulpetTid).getTime())
     .slice(0, 5);
@@ -380,12 +466,16 @@ function LaererStatus({ ko }) {
           )}
         </StatsPanel>
 
-        <StatsPanel title="Hva elevene sjekket først" eyebrow="Forarbeid">
-          <div className="bar-chart">
-            {sjekketStatistikk.map((item) => (
-              <BarRow key={item.valg} label={item.valg} value={item.antall} max={maksSjekketAntall} />
-            ))}
-          </div>
+        <StatsPanel title="Hjulpet per måned" eyebrow="Måned">
+          {maanedsStatistikk.length === 0 ? (
+            <div className="empty-queue">Ingen månedsdata ennå.</div>
+          ) : (
+            <div className="bar-chart">
+              {maanedsStatistikk.map((item) => (
+                <BarRow key={item.key} label={item.label} value={item.antall} max={maksMaanedAntall} />
+              ))}
+            </div>
+          )}
         </StatsPanel>
       </div>
 
@@ -433,7 +523,7 @@ function BarRow({ label, value, max }) {
   );
 }
 
-function LaererPage({ ko, koFeil, onMerkHjulpet, sistOppdatert }) {
+function LaererPage({ ko, koFeil, onMerkHjulpet, onTilbakestillKo, sistOppdatert }) {
   const aktivKo = ko.filter((innslag) => !innslag.hjulpet);
 
   return (
@@ -450,6 +540,13 @@ function LaererPage({ ko, koFeil, onMerkHjulpet, sistOppdatert }) {
           <strong>aktive</strong>
         </div>
       </header>
+
+      <div className="teacher-actions">
+        <button type="button" className="danger-button" onClick={onTilbakestillKo}>
+          <RotateCcw size={18} />
+          Tilbakestill kø
+        </button>
+      </div>
 
       <LaererStatus ko={ko} />
 
@@ -582,6 +679,29 @@ export default function App() {
     setSistOppdatert(new Date());
   }
 
+  async function tilbakestillKo() {
+    const bekreftet = window.confirm("Er du sikker på at du vil tilbakestille den aktive køen?");
+    if (!bekreftet) return;
+
+    const response = await fetch("/api/teacher/queue", {
+      method: "DELETE",
+      headers: { Authorization: laererAuthHeader() },
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      setLaererKoFeil(data.message || "Kunne ikke tilbakestille køen.");
+      return;
+    }
+
+    const [nyElevKo, nyLaererKo] = await Promise.all([hentElevKoFraApi(), hentLaererKoFraApi()]);
+    setElevKo(nyElevKo);
+    setLaererKo(nyLaererKo);
+    setKoFeil("");
+    setLaererKoFeil("");
+    setSistOppdatert(new Date());
+  }
+
   function loggUt() {
     sessionStorage.removeItem(TEACHER_STORAGE_KEY);
     setErLaererInnlogget(false);
@@ -601,6 +721,7 @@ export default function App() {
             koFeil={laererKoFeil}
             sistOppdatert={sistOppdatert}
             onMerkHjulpet={merkSomHjulpet}
+            onTilbakestillKo={tilbakestillKo}
           />
         ) : (
           <HandsopprekkingPage
