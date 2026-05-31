@@ -105,6 +105,17 @@ export function publicQueue(queue) {
     .map(({ id, navn, opprettet }) => ({ id, navn, opprettet }));
 }
 
+export function anonymizeHelpedQueue(queue) {
+  return queue.map((entry) =>
+    entry.hjulpet
+      ? {
+          ...entry,
+          navn: "Anonym elev",
+        }
+      : entry
+  );
+}
+
 export function normalizeName(navn) {
   return String(navn || "")
     .trim()
