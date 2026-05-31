@@ -384,6 +384,35 @@ h2 {
   box-shadow: 2px 2px 0 var(--ink);
 }
 
+.teacher-tabs {
+  display: inline-flex;
+  width: fit-content;
+  gap: 8px;
+  padding: 8px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--small-shadow);
+}
+
+.teacher-tabs button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 950;
+}
+
+.teacher-tabs button.active {
+  border-color: var(--ink);
+  background: var(--gray-300);
+}
+
 .teacher-actions {
   display: flex;
   justify-content: flex-end;

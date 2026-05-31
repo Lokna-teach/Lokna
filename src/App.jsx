@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
+  BarChart3,
   ClipboardCheck,
   Hand,
   ListChecks,
@@ -543,8 +544,17 @@ function BarRow({ label, value, max }) {
   );
 }
 
-function LaererPage({ ko, koFeil, onMerkHjulpet, onTilbakestillKo, sistOppdatert }) {
+function LaererPage({
+  ko,
+  koFeil,
+  laererVisning,
+  onByttLaererVisning,
+  onMerkHjulpet,
+  onTilbakestillKo,
+  sistOppdatert,
+}) {
   const aktivKo = ko.filter((innslag) => !innslag.hjulpet);
+  const viserStatistikk = laererVisning === "statistikk";
 
   return (
     <section className="page">
@@ -561,54 +571,77 @@ function LaererPage({ ko, koFeil, onMerkHjulpet, onTilbakestillKo, sistOppdatert
         </div>
       </header>
 
-      <div className="teacher-actions">
-        <button type="button" className="danger-button" onClick={onTilbakestillKo}>
-          <RotateCcw size={18} />
-          Tilbakestill kø
+      <div className="teacher-tabs" aria-label="Lærervalg">
+        <button
+          type="button"
+          className={!viserStatistikk ? "active" : ""}
+          onClick={() => onByttLaererVisning("ko")}
+        >
+          <ListChecks size={18} />
+          Aktiv kø
+        </button>
+        <button
+          type="button"
+          className={viserStatistikk ? "active" : ""}
+          onClick={() => onByttLaererVisning("statistikk")}
+        >
+          <BarChart3 size={18} />
+          Statistikk
         </button>
       </div>
 
-      <LaererStatus ko={ko} />
-
-      <section className="card">
-        <div className="section-heading">
-          <div className="section-icon">
-            <ClipboardCheck size={22} />
+      {viserStatistikk ? (
+        <LaererStatus ko={ko} />
+      ) : (
+        <>
+          <div className="teacher-actions">
+            <button type="button" className="danger-button" onClick={onTilbakestillKo}>
+              <RotateCcw size={18} />
+              Tilbakestill kø
+            </button>
           </div>
-          <div>
-            <p className="portal-eyebrow">Aktiv kø</p>
-            <h2>{aktivKo.length} i kø</h2>
-            {sistOppdatert && (
-              <p className="queue-updated">Sist oppdatert {sistOppdatert.toLocaleTimeString("nb-NO")}</p>
+
+          <section className="card">
+            <div className="section-heading">
+              <div className="section-icon">
+                <ClipboardCheck size={22} />
+              </div>
+              <div>
+                <p className="portal-eyebrow">Aktiv kø</p>
+                <h2>{aktivKo.length} i kø</h2>
+                {sistOppdatert && (
+                  <p className="queue-updated">Sist oppdatert {sistOppdatert.toLocaleTimeString("nb-NO")}</p>
+                )}
+              </div>
+            </div>
+
+            {koFeil ? (
+              <div className="queue-error">{koFeil}</div>
+            ) : aktivKo.length === 0 ? (
+              <div className="empty-queue">Ingen venter på hjelp.</div>
+            ) : (
+              <div className="teacher-queue-list">
+                {aktivKo.map((innslag, index) => (
+                  <article className="teacher-queue-item" key={innslag.id}>
+                    <div>
+                      <div className="teacher-item-title">
+                        <span>{index + 1}</span>
+                        <h3>{innslag.navn}</h3>
+                      </div>
+                      <p>{innslag.gjelder}</p>
+                      <p className="muted-text">Sjekket: {innslag.sjekket.join(", ")}</p>
+                    </div>
+                    <label className="resolve-checkbox">
+                      <input type="checkbox" onChange={() => onMerkHjulpet(innslag.id)} />
+                      <span>Hjulpet</span>
+                    </label>
+                  </article>
+                ))}
+              </div>
             )}
-          </div>
-        </div>
-
-        {koFeil ? (
-          <div className="queue-error">{koFeil}</div>
-        ) : aktivKo.length === 0 ? (
-          <div className="empty-queue">Ingen venter på hjelp.</div>
-        ) : (
-          <div className="teacher-queue-list">
-            {aktivKo.map((innslag, index) => (
-              <article className="teacher-queue-item" key={innslag.id}>
-                <div>
-                  <div className="teacher-item-title">
-                    <span>{index + 1}</span>
-                    <h3>{innslag.navn}</h3>
-                  </div>
-                  <p>{innslag.gjelder}</p>
-                  <p className="muted-text">Sjekket: {innslag.sjekket.join(", ")}</p>
-                </div>
-                <label className="resolve-checkbox">
-                  <input type="checkbox" onChange={() => onMerkHjulpet(innslag.id)} />
-                  <span>Hjulpet</span>
-                </label>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
+          </section>
+        </>
+      )}
     </section>
   );
 }
@@ -622,6 +655,7 @@ export default function App() {
   const [laererKo, setLaererKo] = useState([]);
   const [koFeil, setKoFeil] = useState("");
   const [laererKoFeil, setLaererKoFeil] = useState("");
+  const [laererVisning, setLaererVisning] = useState("ko");
   const [sistOppdatert, setSistOppdatert] = useState(null);
 
   useEffect(() => {
@@ -728,12 +762,19 @@ export default function App() {
         <TopBar erLaererInnlogget={erLaererInnlogget} onLogout={loggUt} />
 
         {visLaerer && !erLaererInnlogget ? (
-          <LoginScreen onLogin={() => setErLaererInnlogget(true)} />
+          <LoginScreen
+            onLogin={() => {
+              setErLaererInnlogget(true);
+              setLaererVisning("ko");
+            }}
+          />
         ) : visLaerer ? (
           <LaererPage
             ko={laererKo}
             koFeil={laererKoFeil}
+            laererVisning={laererVisning}
             sistOppdatert={sistOppdatert}
+            onByttLaererVisning={setLaererVisning}
             onMerkHjulpet={merkSomHjulpet}
             onTilbakestillKo={tilbakestillKo}
           />
