@@ -1,4 +1,4 @@
-import { isTeacherAuthorized, readQueue, sendJson, writeQueue } from "../../_queueStore.js";
+import { anonymizeHelpedQueue, isTeacherAuthorized, readQueue, sendJson, writeQueue } from "../../_queueStore.js";
 
 export default async function handler(request, response) {
   try {
@@ -23,7 +23,8 @@ export default async function handler(request, response) {
 
     entry.hjulpet = true;
     entry.hjulpetTid = new Date().toISOString();
-    await writeQueue(queue);
+    entry.navn = "Anonym elev";
+    await writeQueue(anonymizeHelpedQueue(queue));
 
     sendJson(response, 200, { ok: true });
   } catch (error) {
