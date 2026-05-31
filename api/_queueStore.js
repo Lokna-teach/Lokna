@@ -5,7 +5,29 @@ const CHECKLIST_VALUES = new Set([
   "Teams",
   "Fagbok",
   "Spurt en klassekompis",
+  "Har lett i klasserommet",
 ]);
+
+const BLOCKED_NAME_WORDS = [
+  "admin",
+  "anonymous",
+  "anonym",
+  "bitch",
+  "dritt",
+  "faen",
+  "fuck",
+  "hitler",
+  "hore",
+  "idiot",
+  "kuk",
+  "nazi",
+  "neger",
+  "penis",
+  "rasist",
+  "sex",
+  "test",
+  "tiss",
+];
 
 export const teacherUsername = process.env.TEACHER_USERNAME || "hamstr";
 export const teacherPassword = process.env.TEACHER_PASSWORD || "lokna";
@@ -90,6 +112,38 @@ export function normalizeName(navn) {
     .toLowerCase();
 }
 
+function normalizeForFilter(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9æøå]/g, "");
+}
+
+function validateStudentName(navn) {
+  const trimmed = String(navn || "").trim();
+  const normalized = normalizeForFilter(trimmed);
+
+  if (trimmed.length < 2) return "Skriv inn et ekte navn.";
+  if (trimmed.length > 20) return "Navnet kan maks være 20 bokstaver.";
+  if (!/^[a-zA-ZæøåÆØÅ ]+$/.test(trimmed)) {
+    return "Bruk kun bokstaver i navnet.";
+  }
+  if (/(.)\1{3,}/.test(normalized)) return "Bruk et ekte navn.";
+  if (BLOCKED_NAME_WORDS.some((word) => normalized.includes(word))) {
+    return "Bruk et ordentlig navn.";
+  }
+
+  return "";
+}
+
+function countWords(value) {
+  return String(value || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
 export function hasActiveDuplicate(queue, navn) {
   const normalizedName = normalizeName(navn);
   return queue.some((entry) => !entry.hjulpet && normalizeName(entry.navn) === normalizedName);
@@ -102,11 +156,20 @@ export function validateStudentEntry(body) {
     ? body.sjekket.filter((value) => CHECKLIST_VALUES.has(value))
     : [];
 
-  if (!navn || !gjelder || sjekket.length === 0) {
-    return { ok: false, message: "Navn, hva det gjelder og minst ett sjekkpunkt må fylles ut." };
+  const nameError = validateStudentName(navn);
+  if (nameError) {
+    return { ok: false, message: nameError };
   }
 
-  if (navn.length > 80 || gjelder.length > 1000) {
+  if (countWords(gjelder) < 7) {
+    return { ok: false, message: "Skriv minst 7 ord om hva du trenger hjelp til." };
+  }
+
+  if (sjekket.length !== CHECKLIST_VALUES.size) {
+    return { ok: false, message: "Alle punktene i sjekket først må krysses av." };
+  }
+
+  if (gjelder.length > 1000) {
     return { ok: false, message: "Teksten er for lang." };
   }
 
