@@ -19,7 +19,7 @@ export default async function handler(request, response) {
       const validation = validateStudentEntry(request.body || {});
 
       if (!validation.ok) {
-        sendJson(response, 400, { message: validation.message });
+        sendJson(response, 400, { message: validation.message, code: validation.code });
         return;
       }
 

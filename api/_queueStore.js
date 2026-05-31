@@ -14,16 +14,24 @@ const BLOCKED_NAME_WORDS = [
   "anonym",
   "bitch",
   "dritt",
+  "dust",
   "faen",
+  "fitta",
+  "fitte",
+  "forbanna",
   "fuck",
+  "helvete",
   "hitler",
   "hore",
   "idiot",
+  "jævel",
+  "javel",
   "kuk",
   "nazi",
   "neger",
   "penis",
   "rasist",
+  "satan",
   "sex",
   "test",
   "tiss",
@@ -131,6 +139,11 @@ function normalizeForFilter(value) {
     .replace(/[^a-z0-9æøå]/g, "");
 }
 
+function hasUnwantedWords(value) {
+  const normalized = normalizeForFilter(value);
+  return BLOCKED_NAME_WORDS.some((word) => normalized.includes(normalizeForFilter(word)));
+}
+
 function validateStudentName(navn) {
   const trimmed = String(navn || "").trim();
   const normalized = normalizeForFilter(trimmed);
@@ -141,7 +154,7 @@ function validateStudentName(navn) {
     return "Bruk kun bokstaver i navnet.";
   }
   if (/(.)\1{3,}/.test(normalized)) return "Bruk et ekte navn.";
-  if (BLOCKED_NAME_WORDS.some((word) => normalized.includes(word))) {
+  if (hasUnwantedWords(trimmed)) {
     return "Bruk et ordentlig navn.";
   }
 
@@ -166,6 +179,10 @@ export function validateStudentEntry(body) {
   const sjekket = Array.isArray(body.sjekket)
     ? body.sjekket.filter((value) => CHECKLIST_VALUES.has(value))
     : [];
+
+  if (hasUnwantedWords(navn) || hasUnwantedWords(gjelder)) {
+    return { ok: false, message: "FY deg, det er ikke lov :) !", code: "UNWANTED_WORDS" };
+  }
 
   const nameError = validateStudentName(navn);
   if (nameError) {
