@@ -616,19 +616,27 @@ function LaererPage({
 
   return (
     <section className="page">
+      <div className="teacher-tabs" aria-label="Lærervalg">
+        <button
+          type="button"
+          className={!viserStatistikk ? "active" : ""}
+          onClick={() => onByttLaererVisning("ko")}
+        >
+          <ListChecks size={18} />
+          Aktiv kø
+        </button>
+        <button
+          type="button"
+          className={viserStatistikk ? "active" : ""}
+          onClick={() => onByttLaererVisning("statistikk")}
+        >
+          <BarChart3 size={18} />
+          Statistikk
+        </button>
+      </div>
+
       {viserStatistikk ? (
         <>
-          <div className="teacher-tabs" aria-label="Lærervalg">
-            <button type="button" onClick={() => onByttLaererVisning("ko")}>
-              <ListChecks size={18} />
-              Aktiv kø
-            </button>
-            <button type="button" className="active" onClick={() => onByttLaererVisning("statistikk")}>
-              <BarChart3 size={18} />
-              Statistikk
-            </button>
-          </div>
-
           <header className="hero">
             <div>
               <p className="portal-eyebrow">Lærer</p>
