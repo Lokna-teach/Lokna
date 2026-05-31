@@ -5,7 +5,7 @@ const CHECKLIST_VALUES = new Set([
   "Teams",
   "Fagbok",
   "Spurt en klassekompis",
-  "Har lett i klasserommet",
+  "Har sett i hele klasserommet",
 ]);
 
 const BLOCKED_NAME_WORDS = [
