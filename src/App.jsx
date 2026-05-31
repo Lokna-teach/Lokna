@@ -28,16 +28,24 @@ const blokkerteNavnOrd = [
   "anonym",
   "bitch",
   "dritt",
+  "dust",
   "faen",
+  "fitta",
+  "fitte",
+  "forbanna",
   "fuck",
+  "helvete",
   "hitler",
   "hore",
   "idiot",
+  "jævel",
+  "javel",
   "kuk",
   "nazi",
   "neger",
   "penis",
   "rasist",
+  "satan",
   "sex",
   "test",
   "tiss",
@@ -55,6 +63,11 @@ function normalizeForFilter(value) {
     .replace(/[^a-z0-9æøå]/g, "");
 }
 
+function hasUnwantedWords(value) {
+  const normalized = normalizeForFilter(value);
+  return blokkerteNavnOrd.some((ord) => normalized.includes(normalizeForFilter(ord)));
+}
+
 function validateStudentName(navn) {
   const trimmed = String(navn || "").trim();
   const normalized = normalizeForFilter(trimmed);
@@ -65,11 +78,24 @@ function validateStudentName(navn) {
     return "Bruk kun bokstaver i navnet.";
   }
   if (/(.)\1{3,}/.test(normalized)) return "Bruk et ekte navn.";
-  if (blokkerteNavnOrd.some((ord) => normalized.includes(ord))) {
+  if (hasUnwantedWords(trimmed)) {
     return "Bruk et ordentlig navn.";
   }
 
   return "";
+}
+
+function FyModal({ onClose }) {
+  return (
+    <div className="fy-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="fy-modal-title">
+      <div className="fy-modal">
+        <h2 id="fy-modal-title">FY deg, det er ikke lov :) !</h2>
+        <button type="button" className="primary-button" onClick={onClose}>
+          Ok, jeg skal være snill
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function countWords(value) {
@@ -236,6 +262,7 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
   const [sjekket, setSjekket] = useState([]);
   const [melding, setMelding] = useState("");
   const [sender, setSender] = useState(false);
+  const [visFyPopup, setVisFyPopup] = useState(false);
 
   function toggleSjekket(valg) {
     setSjekket((forrige) =>
@@ -247,6 +274,12 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (hasUnwantedWords(navn) || hasUnwantedWords(gjelder)) {
+      setVisFyPopup(true);
+      setMelding("");
+      return;
+    }
 
     const navnFeil = validateStudentName(navn);
     if (navnFeil) {
@@ -279,7 +312,10 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
       setMelding(`Du er lagt i kø som nummer ${plass}.`);
     } catch (error) {
       if (error.message === "fy!") {
-        window.alert("fy!");
+        setVisFyPopup(true);
+      }
+      if (error.message === "FY deg, det er ikke lov :) !") {
+        setVisFyPopup(true);
       }
       setMelding(error.message || "Kunne ikke legge deg i kø akkurat nå.");
     } finally {
@@ -289,6 +325,8 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
 
   return (
     <section className="page">
+      {visFyPopup && <FyModal onClose={() => setVisFyPopup(false)} />}
+
       <header className="hero">
         <div>
           <h1>Håndsopprekking</h1>

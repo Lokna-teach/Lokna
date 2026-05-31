@@ -687,6 +687,35 @@ h2 {
   box-shadow: 4px 4px 0 var(--ink);
 }
 
+.fy-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(17 24 39 / 62%);
+}
+
+.fy-modal {
+  display: grid;
+  width: min(680px, 100%);
+  gap: 24px;
+  padding: 32px;
+  border: 4px solid var(--ink);
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: 12px 12px 0 var(--ink);
+  text-align: center;
+}
+
+.fy-modal h2 {
+  margin: 0;
+  font-size: 60px;
+  line-height: 1;
+  font-weight: 950;
+}
+
 @media (max-width: 980px) {
   .layout,
   .stat-grid,
@@ -736,6 +765,10 @@ h2 {
 
   .section-heading {
     align-items: flex-start;
+  }
+
+  .fy-modal h2 {
+    font-size: 60px;
   }
 
 }
