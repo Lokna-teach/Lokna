@@ -59,6 +59,10 @@ function publicQueue() {
     .map(({ id, navn, opprettet }) => ({ id, navn, opprettet }));
 }
 
+function anonymizeHelpedQueue(items) {
+  return items.map((entry) => (entry.hjulpet ? { ...entry, navn: "Anonym elev" } : entry));
+}
+
 function normalizeName(navn) {
   return String(navn || "")
     .trim()
@@ -193,6 +197,7 @@ createServer(async (request, response) => {
         return;
       }
 
+      queue = anonymizeHelpedQueue(queue);
       sendJson(response, 200, { queue });
       return;
     }
@@ -203,7 +208,7 @@ createServer(async (request, response) => {
         return;
       }
 
-      queue = queue.filter((entry) => entry.hjulpet);
+      queue = anonymizeHelpedQueue(queue).filter((entry) => entry.hjulpet);
       sendJson(response, 200, { ok: true, queue });
       return;
     }
@@ -224,6 +229,8 @@ createServer(async (request, response) => {
 
       entry.hjulpet = true;
       entry.hjulpetTid = new Date().toISOString();
+      entry.navn = "Anonym elev";
+      queue = anonymizeHelpedQueue(queue);
       sendJson(response, 200, { ok: true });
       return;
     }
