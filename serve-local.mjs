@@ -16,7 +16,7 @@ const checklistValues = new Set([
   "Teams",
   "Fagbok",
   "Spurt en klassekompis",
-  "Har lett i klasserommet",
+  "Har sett i hele klasserommet",
 ]);
 const blockedNameWords = [
   "admin",
