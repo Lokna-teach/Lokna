@@ -2,11 +2,15 @@ import React, { useEffect, useState } from "react";
 import {
   BarChart3,
   ClipboardCheck,
+  GraduationCap,
   Hand,
   ListChecks,
   LockKeyhole,
   LogOut,
+  Package,
+  PlusCircle,
   RotateCcw,
+  Wrench,
   Users,
 } from "lucide-react";
 
@@ -26,29 +30,59 @@ const blokkerteNavnOrd = [
   "admin",
   "anonymous",
   "anonym",
+  "alkohol",
   "bitch",
+  "batman",
+  "captainamerica",
+  "cannabis",
+  "darthvader",
   "dritt",
+  "dop",
+  "drugs",
   "dust",
+  "gandalf",
+  "goku",
   "faen",
   "fitta",
   "fitte",
   "forbanna",
   "fuck",
+  "hasj",
   "helvete",
   "hitler",
   "hore",
   "idiot",
+  "ironman",
   "jævel",
   "javel",
+  "joker",
+  "kokain",
+  "krig",
   "kuk",
+  "marihuana",
+  "marijuana",
   "nazi",
   "neger",
+  "narkotika",
+  "naruto",
   "penis",
+  "pikachu",
+  "pokemon",
   "rasist",
+  "rus",
+  "rusmiddel",
+  "sauron",
   "satan",
   "sex",
+  "spiderman",
+  "superman",
   "test",
   "tiss",
+  "thor",
+  "voldemort",
+  "weed",
+  "ww2",
+  "yoda",
 ];
 
 function hasValue(value) {
@@ -175,6 +209,21 @@ async function hentLaererKoFraApi() {
   return Array.isArray(data.queue) ? data.queue : [];
 }
 
+async function hentMateriellFraApi() {
+  const response = await fetch("/api/material", { cache: "no-store" });
+  const data = await readApiResponse(response, "Materiell-listen svarte ikke riktig.");
+  return Array.isArray(data.list) ? data.list : [];
+}
+
+async function hentLaererMateriellFraApi() {
+  const response = await fetch("/api/teacher/material", {
+    cache: "no-store",
+    headers: { Authorization: laererAuthHeader() },
+  });
+  const data = await readApiResponse(response, "Materiell-listen svarte ikke riktig.");
+  return Array.isArray(data.list) ? data.list : [];
+}
+
 function LoginScreen({ onLogin }) {
   const [brukernavn, setBrukernavn] = useState("");
   const [passord, setPassord] = useState("");
@@ -239,24 +288,298 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-function TopBar({ erLaererInnlogget, onLogout }) {
+function TopBar({ aktivSide, erLaererInnlogget, onLogout, onOpenTeacher, onVelgSide }) {
   return (
     <header className="top-bar">
-      <div className="brand-mark">
-        <Hand size={20} />
-        <span>Håndsopprekking</span>
-      </div>
-      {erLaererInnlogget && (
+      {erLaererInnlogget ? (
+        <div className="brand-mark">
+          <GraduationCap size={20} />
+          <span>Lærervisning</span>
+        </div>
+      ) : (
+        <div className="top-nav">
+          <button
+            type="button"
+            className={`nav-pill ${aktivSide === "handsopprekking" ? "active" : ""}`}
+            onClick={() => onVelgSide("handsopprekking")}
+          >
+            <Hand size={20} />
+            Håndsopprekking
+          </button>
+          <button
+            type="button"
+            className={`nav-pill ${aktivSide === "materiell" ? "active" : ""}`}
+            onClick={() => onVelgSide("materiell")}
+          >
+            <Wrench size={20} />
+            Materiell/verktøy
+          </button>
+        </div>
+      )}
+
+      {erLaererInnlogget ? (
         <button type="button" className="ghost-button" onClick={onLogout}>
           <LogOut size={18} />
           Logg ut
+        </button>
+      ) : (
+        <button type="button" className="teacher-login-button" onClick={onOpenTeacher}>
+          <GraduationCap size={20} />
+          Lærer
         </button>
       )}
     </header>
   );
 }
 
-function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeacher }) {
+function MaterialList({ list }) {
+  if (list.length === 0) {
+    return <div className="empty-queue">Ingen materiell eller verktøy er lagt inn ennå.</div>;
+  }
+
+  return (
+    <div className="material-list">
+      {list.map((item) => (
+        <article className="material-item" key={item.id}>
+          <div>
+            <strong>{item.typeUtstyr}</strong>
+            <p>El nummer: {item.elnummer}</p>
+          </div>
+          <span>{item.antall} stk</span>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function MaterialStatus({ list }) {
+  const behandlet = list.filter((item) => item.behandlet && item.behandletTid);
+  const maanedsStatistikk = Object.entries(
+    behandlet.reduce((statistikk, item) => {
+      const key = formatMonthKey(item.behandletTid);
+      if (!key) return statistikk;
+      return { ...statistikk, [key]: (statistikk[key] || 0) + 1 };
+    }, {})
+  )
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, antall]) => ({ key, label: formatMonthLabel(key), antall }));
+  const maksMaanedAntall = Math.max(1, ...maanedsStatistikk.map((item) => item.antall));
+  const sisteBehandlet = [...behandlet]
+    .sort((a, b) => new Date(b.behandletTid).getTime() - new Date(a.behandletTid).getTime())
+    .slice(0, 5);
+
+  return (
+    <div className="teacher-status">
+      <div className="stat-grid">
+        <div className="stat-card">
+          <span>Totalt behandlet</span>
+          <strong>{behandlet.length}</strong>
+        </div>
+        <div className="stat-card">
+          <span>Aktive ønsker</span>
+          <strong>{list.filter((item) => !item.behandlet).length}</strong>
+        </div>
+        <div className="stat-card">
+          <span>Sist behandlet</span>
+          <strong>{behandlet.length ? formatDato(sisteBehandlet[0].behandletTid) : "-"}</strong>
+        </div>
+        <div className="stat-card">
+          <span>Antall totalt</span>
+          <strong>{behandlet.reduce((sum, item) => sum + Number(item.antall || 0), 0)}</strong>
+        </div>
+      </div>
+
+      <StatsPanel title="Materiell per måned" eyebrow="Statistikk">
+        {maanedsStatistikk.length === 0 ? (
+          <div className="empty-queue">Ingen behandlet materiell ennå.</div>
+        ) : (
+          <div className="bar-chart">
+            {maanedsStatistikk.map((item) => (
+              <BarRow key={item.key} label={item.label} value={item.antall} max={maksMaanedAntall} />
+            ))}
+          </div>
+        )}
+      </StatsPanel>
+
+      <StatsPanel title="Historikk" eyebrow="Materiell">
+        {sisteBehandlet.length === 0 ? (
+          <div className="empty-queue">Ingen historikk ennå.</div>
+        ) : (
+          <div className="material-list">
+            {sisteBehandlet.map((item) => (
+              <article className="material-item" key={item.id}>
+                <div>
+                  <strong>{item.typeUtstyr}</strong>
+                  <p>El nummer: {item.elnummer}</p>
+                  <p>Behandlet: {formatDato(item.behandletTid)}</p>
+                </div>
+                <span>{item.antall} stk</span>
+              </article>
+            ))}
+          </div>
+        )}
+      </StatsPanel>
+    </div>
+  );
+}
+
+function MateriellPage({ list, feil, onLeggTilMateriell }) {
+  const [elnummer, setElnummer] = useState("");
+  const [typeUtstyr, setTypeUtstyr] = useState("");
+  const [antall, setAntall] = useState(1);
+  const [harSjekket, setHarSjekket] = useState(false);
+  const [melding, setMelding] = useState("");
+  const [sender, setSender] = useState(false);
+  const [visFyPopup, setVisFyPopup] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    if (hasUnwantedWords(typeUtstyr)) {
+      setVisFyPopup(true);
+      setMelding("");
+      return;
+    }
+
+    if (!hasValue(elnummer) || !hasValue(typeUtstyr) || !Number.isFinite(Number(antall))) {
+      setMelding("Fyll inn el nummer, type utstyr og antall.");
+      return;
+    }
+
+    if (!harSjekket) {
+      setMelding("Du må først sjekke i klasserommet og på lager.");
+      return;
+    }
+
+    setSender(true);
+    try {
+      await onLeggTilMateriell({
+        elnummer: elnummer.trim(),
+        typeUtstyr: typeUtstyr.trim(),
+        antall: Number(antall),
+        harSjekket,
+      });
+      setElnummer("");
+      setTypeUtstyr("");
+      setAntall(1);
+      setHarSjekket(false);
+      setMelding("Lagt til i materiell-listen.");
+    } catch (error) {
+      if (error.message === "FY deg, det er ikke lov :) !") {
+        setVisFyPopup(true);
+      }
+      setMelding(error.message || "Kunne ikke legge til akkurat nå.");
+    } finally {
+      setSender(false);
+    }
+  }
+
+  return (
+    <section className="page">
+      {visFyPopup && <FyModal onClose={() => setVisFyPopup(false)} />}
+
+      <header className="hero">
+        <div>
+          <h1>Materiell/verktøy</h1>
+          <p>Legg inn materiell eller verktøy som mangler etter at du har sjekket først.</p>
+        </div>
+        <div className="hero-stat">
+          <Package size={22} />
+          <span>{list.length}</span>
+          <strong>på lista</strong>
+        </div>
+      </header>
+
+      <div className="layout">
+        <section className="card">
+          <div className="section-heading">
+            <div className="section-icon">
+              <PlusCircle size={22} />
+            </div>
+            <div>
+              <p className="portal-eyebrow">Elev</p>
+              <h2>Legg til i liste</h2>
+              <p className="muted-text">Sjekk klasserommet og lager før du legger inn behovet.</p>
+            </div>
+          </div>
+
+          <form className="form" onSubmit={handleSubmit}>
+            <label className="field">
+              <span>El nummer</span>
+              <input
+                inputMode="numeric"
+                value={elnummer}
+                onChange={(event) => {
+                  setElnummer(event.target.value);
+                  setMelding("");
+                }}
+                placeholder="F.eks. 1234567"
+              />
+            </label>
+
+            <label className="field">
+              <span>Type utstyr</span>
+              <input
+                value={typeUtstyr}
+                onChange={(event) => {
+                  setTypeUtstyr(event.target.value);
+                  setMelding("");
+                }}
+                placeholder="F.eks. PR 2x2,5 eller tang"
+              />
+            </label>
+
+            <label className="field">
+              <span>Antall</span>
+              <input
+                min={1}
+                max={999}
+                type="number"
+                value={antall}
+                onChange={(event) => {
+                  setAntall(event.target.value);
+                  setMelding("");
+                }}
+              />
+            </label>
+
+            <label className={`checkbox-row single-check ${harSjekket ? "checked" : ""}`}>
+              <input
+                checked={harSjekket}
+                type="checkbox"
+                onChange={(event) => {
+                  setHarSjekket(event.target.checked);
+                  setMelding("");
+                }}
+              />
+              <span>Har sett i klasserommet/på lager</span>
+            </label>
+
+            {melding && <p className="queue-message">{melding}</p>}
+
+            <button type="submit" className="primary-button" disabled={sender}>
+              {sender ? "Legger til..." : "Legg til i liste"}
+            </button>
+          </form>
+        </section>
+
+        <aside className="queue-panel">
+          <div className="queue-panel-header">
+            <div>
+              <p className="portal-eyebrow">Liste</p>
+              <h2>Materiell og verktøy</h2>
+              <p className="muted-text">Enkel oversikt over det som er meldt inn.</p>
+            </div>
+          </div>
+
+          {feil ? <div className="queue-error">{feil}</div> : <MaterialList list={list} />}
+        </aside>
+      </div>
+    </section>
+  );
+}
+
+function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert }) {
   const [navn, setNavn] = useState("");
   const [gjelder, setGjelder] = useState("");
   const [sjekket, setSjekket] = useState([]);
@@ -409,19 +732,19 @@ function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert, onOpenTeach
           </form>
         </section>
 
-        <QueuePanel ko={ko} koFeil={koFeil} sistOppdatert={sistOppdatert} onOpenTeacher={onOpenTeacher} />
+        <QueuePanel ko={ko} koFeil={koFeil} sistOppdatert={sistOppdatert} />
       </div>
     </section>
   );
 }
 
-function QueuePanel({ ko, koFeil, sistOppdatert, onOpenTeacher }) {
+function QueuePanel({ ko, koFeil, sistOppdatert }) {
   return (
     <aside className="queue-panel" aria-live="polite">
       <div className="queue-panel-header">
         <div>
           <p className="portal-eyebrow">Oppdateres ca. hvert minutt</p>
-          <h2 onDoubleClick={onOpenTeacher}>Kø</h2>
+          <h2>Kø</h2>
           <p className="muted-text">Kun navn og plass i kø vises her.</p>
         </div>
         <div className="queue-count">
@@ -640,24 +963,85 @@ function ActiveQueueSection({ aktivKo, koFeil, onMerkHjulpet, onTilbakestillKo, 
   );
 }
 
+function TeacherMaterialSection({ list, feil, onMerkMateriell }) {
+  const aktivMateriell = list.filter((item) => !item.behandlet);
+
+  return (
+    <>
+      <header className="hero">
+        <div>
+          <p className="portal-eyebrow">Lærer</p>
+          <h1>Materiell</h1>
+          <p>Oversikt over materiell og verktøy som elever har lagt inn.</p>
+        </div>
+        <div className="hero-stat">
+          <Package size={22} />
+          <span>{aktivMateriell.length}</span>
+          <strong>innmeldt</strong>
+        </div>
+      </header>
+
+      <section className="card">
+        <div className="section-heading">
+          <div className="section-icon">
+            <Wrench size={22} />
+          </div>
+          <div>
+            <p className="portal-eyebrow">Liste</p>
+            <h2>Materiell og verktøy</h2>
+          </div>
+        </div>
+
+        {feil ? (
+          <div className="queue-error">{feil}</div>
+        ) : aktivMateriell.length === 0 ? (
+          <div className="empty-queue">Ingen aktive materiellønsker.</div>
+        ) : (
+          <div className="material-list">
+            {aktivMateriell.map((item) => (
+              <article className="material-item" key={item.id}>
+                <div>
+                  <strong>{item.typeUtstyr}</strong>
+                  <p>El nummer: {item.elnummer}</p>
+                </div>
+                <span>{item.antall} stk</span>
+                <label className="resolve-checkbox">
+                  <input type="checkbox" onChange={() => onMerkMateriell(item.id)} />
+                  <span>Ordnet</span>
+                </label>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <MaterialStatus list={list} />
+    </>
+  );
+}
+
 function LaererPage({
   ko,
   koFeil,
   laererVisning,
+  materiellFeil,
+  materiellList,
   onByttLaererVisning,
   onMerkHjulpet,
+  onMerkMateriell,
   onTilbakestillKo,
   sistOppdatert,
 }) {
   const aktivKo = ko.filter((innslag) => !innslag.hjulpet);
   const viserStatistikk = laererVisning === "statistikk";
+  const viserMateriell = laererVisning === "materiell";
 
   return (
     <section className="page">
       <div className="teacher-tabs" aria-label="Lærervalg">
         <button
           type="button"
-          className={!viserStatistikk ? "active" : ""}
+          className={!viserStatistikk && !viserMateriell ? "active" : ""}
           onClick={() => onByttLaererVisning("ko")}
         >
           <ListChecks size={18} />
@@ -671,9 +1055,19 @@ function LaererPage({
           <BarChart3 size={18} />
           Statistikk
         </button>
+        <button
+          type="button"
+          className={viserMateriell ? "active" : ""}
+          onClick={() => onByttLaererVisning("materiell")}
+        >
+          <Package size={18} />
+          Materiell
+        </button>
       </div>
 
-      {viserStatistikk ? (
+      {viserMateriell ? (
+        <TeacherMaterialSection list={materiellList} feil={materiellFeil} onMerkMateriell={onMerkMateriell} />
+      ) : viserStatistikk ? (
         <>
           <header className="hero">
             <div>
@@ -705,14 +1099,18 @@ function LaererPage({
 }
 
 export default function App() {
+  const [aktivSide, setAktivSide] = useState("handsopprekking");
   const [visLaerer, setVisLaerer] = useState(false);
   const [erLaererInnlogget, setErLaererInnlogget] = useState(
     () => sessionStorage.getItem(TEACHER_STORAGE_KEY) === "true"
   );
   const [elevKo, setElevKo] = useState([]);
   const [laererKo, setLaererKo] = useState([]);
+  const [materiellList, setMateriellList] = useState([]);
   const [koFeil, setKoFeil] = useState("");
   const [laererKoFeil, setLaererKoFeil] = useState("");
+  const [materiellFeil, setMateriellFeil] = useState("");
+  const [laererMateriellFeil, setLaererMateriellFeil] = useState("");
   const [laererVisning, setLaererVisning] = useState("ko");
   const [sistOppdatert, setSistOppdatert] = useState(null);
 
@@ -734,13 +1132,33 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (erLaererInnlogget) return undefined;
+
+    async function oppdaterMateriell() {
+      try {
+        const list = await hentMateriellFraApi();
+        setMateriellList(list);
+        setMateriellFeil("");
+      } catch (error) {
+        setMateriellFeil(error.message || "Materiell-listen svarer ikke.");
+      }
+    }
+
+    oppdaterMateriell();
+    const intervall = window.setInterval(oppdaterMateriell, 60000);
+    return () => window.clearInterval(intervall);
+  }, [erLaererInnlogget]);
+
+  useEffect(() => {
     if (!erLaererInnlogget) return undefined;
 
     async function oppdaterLaererKo() {
       try {
-        const ko = await hentLaererKoFraApi();
+        const [ko, materiell] = await Promise.all([hentLaererKoFraApi(), hentLaererMateriellFraApi()]);
         setLaererKo(ko);
+        setMateriellList(materiell);
         setLaererKoFeil("");
+        setLaererMateriellFeil("");
         setSistOppdatert(new Date());
       } catch (error) {
         setLaererKoFeil(error.message || "Køserveren svarer ikke.");
@@ -751,6 +1169,12 @@ export default function App() {
     const intervall = window.setInterval(oppdaterLaererKo, 15000);
     return () => window.clearInterval(intervall);
   }, [erLaererInnlogget]);
+
+  function velgElevSide(side) {
+    if (erLaererInnlogget) return;
+    setAktivSide(side);
+    setVisLaerer(false);
+  }
 
   async function leggTilIKo(innslag) {
     const response = await fetch("/api/queue", {
@@ -767,6 +1191,19 @@ export default function App() {
     return data.plass;
   }
 
+  async function leggTilMateriell(innslag) {
+    const response = await fetch("/api/material", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(innslag),
+    });
+    await readApiResponse(response, "Kunne ikke legge til materiell.");
+
+    const list = await hentMateriellFraApi();
+    setMateriellList(list);
+    setMateriellFeil("");
+  }
+
   async function merkSomHjulpet(id) {
     try {
       const response = await fetch(`/api/teacher/queue/${encodeURIComponent(id)}`, {
@@ -775,14 +1212,40 @@ export default function App() {
       });
       await readApiResponse(response, "Kunne ikke markere som hjulpet. Sjekk Vercel Functions-loggen.");
 
-      const [nyElevKo, nyLaererKo] = await Promise.all([hentElevKoFraApi(), hentLaererKoFraApi()]);
+      const [nyElevKo, nyLaererKo, nyMateriell] = await Promise.all([
+        hentElevKoFraApi(),
+        hentLaererKoFraApi(),
+        hentLaererMateriellFraApi(),
+      ]);
       setElevKo(nyElevKo);
       setLaererKo(nyLaererKo);
+      setMateriellList(nyMateriell);
       setKoFeil("");
       setLaererKoFeil("");
       setSistOppdatert(new Date());
     } catch (error) {
       setLaererKoFeil(error.message || "Kunne ikke markere som hjulpet.");
+    }
+  }
+
+  async function merkMateriellOrdnet(id) {
+    try {
+      const response = await fetch(`/api/teacher/material/${encodeURIComponent(id)}`, {
+        method: "POST",
+        headers: { Authorization: laererAuthHeader() },
+      });
+      await readApiResponse(response, "Kunne ikke markere materiell som ordnet.");
+
+      const [elevMateriell, laererMateriell] = await Promise.all([
+        hentMateriellFraApi(),
+        hentLaererMateriellFraApi(),
+      ]);
+      setMateriellList(erLaererInnlogget ? laererMateriell : elevMateriell);
+      setMateriellFeil("");
+      setLaererMateriellFeil("");
+      setSistOppdatert(new Date());
+    } catch (error) {
+      setLaererMateriellFeil(error.message || "Kunne ikke markere materiell som ordnet.");
     }
   }
 
@@ -812,29 +1275,46 @@ export default function App() {
     sessionStorage.removeItem(TEACHER_STORAGE_KEY);
     setErLaererInnlogget(false);
     setVisLaerer(false);
+    setLaererVisning("ko");
   }
 
   return (
     <div className="app-shell">
       <div className="app-container">
-        <TopBar erLaererInnlogget={erLaererInnlogget} onLogout={loggUt} />
+        <TopBar
+          aktivSide={aktivSide}
+          erLaererInnlogget={erLaererInnlogget}
+          onLogout={loggUt}
+          onOpenTeacher={() => setVisLaerer(true)}
+          onVelgSide={velgElevSide}
+        />
 
         {visLaerer && !erLaererInnlogget ? (
           <LoginScreen
             onLogin={() => {
               setErLaererInnlogget(true);
+              setVisLaerer(true);
               setLaererVisning("ko");
             }}
           />
-        ) : visLaerer ? (
+        ) : erLaererInnlogget ? (
           <LaererPage
             ko={laererKo}
             koFeil={laererKoFeil}
             laererVisning={laererVisning}
+            materiellFeil={laererMateriellFeil}
+            materiellList={materiellList}
             sistOppdatert={sistOppdatert}
             onByttLaererVisning={setLaererVisning}
             onMerkHjulpet={merkSomHjulpet}
+            onMerkMateriell={merkMateriellOrdnet}
             onTilbakestillKo={tilbakestillKo}
+          />
+        ) : aktivSide === "materiell" ? (
+          <MateriellPage
+            list={materiellList}
+            feil={materiellFeil}
+            onLeggTilMateriell={leggTilMateriell}
           />
         ) : (
           <HandsopprekkingPage
@@ -842,7 +1322,6 @@ export default function App() {
             koFeil={koFeil}
             sistOppdatert={sistOppdatert}
             onLeggTil={leggTilIKo}
-            onOpenTeacher={() => setVisLaerer(true)}
           />
         )}
 
