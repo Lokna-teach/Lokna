@@ -1,4 +1,5 @@
 const QUEUE_KEY = "handsopprekking:queue";
+const MATERIAL_KEY = "handsopprekking:material";
 const CHECKLIST_VALUES = new Set([
   "Montørhåndbok",
   "OneNote",
@@ -12,29 +13,59 @@ const BLOCKED_NAME_WORDS = [
   "admin",
   "anonymous",
   "anonym",
+  "alkohol",
   "bitch",
+  "batman",
+  "captainamerica",
+  "cannabis",
+  "darthvader",
   "dritt",
+  "dop",
+  "drugs",
   "dust",
+  "gandalf",
+  "goku",
   "faen",
   "fitta",
   "fitte",
   "forbanna",
   "fuck",
+  "hasj",
   "helvete",
   "hitler",
   "hore",
   "idiot",
+  "ironman",
   "jævel",
   "javel",
+  "joker",
+  "kokain",
+  "krig",
   "kuk",
+  "marihuana",
+  "marijuana",
   "nazi",
   "neger",
+  "narkotika",
+  "naruto",
   "penis",
+  "pikachu",
+  "pokemon",
   "rasist",
+  "rus",
+  "rusmiddel",
+  "sauron",
   "satan",
   "sex",
+  "spiderman",
+  "superman",
   "test",
   "tiss",
+  "thor",
+  "voldemort",
+  "weed",
+  "ww2",
+  "yoda",
 ];
 
 export const teacherUsername = process.env.TEACHER_USERNAME || "hamstr";
@@ -105,6 +136,29 @@ export async function readQueue() {
 
 export async function writeQueue(queue) {
   await redis(["SET", QUEUE_KEY, JSON.stringify(queue)]);
+}
+
+export async function readMaterialList() {
+  const rawList = await redis(["GET", MATERIAL_KEY]);
+
+  if (!rawList) {
+    return [];
+  }
+
+  try {
+    const list = JSON.parse(rawList);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function writeMaterialList(list) {
+  await redis(["SET", MATERIAL_KEY, JSON.stringify(list)]);
+}
+
+export function publicMaterialList(list) {
+  return list.filter((entry) => !entry.behandlet);
 }
 
 export function publicQueue(queue) {
@@ -202,4 +256,44 @@ export function validateStudentEntry(body) {
   }
 
   return { ok: true, entry: { navn, gjelder, sjekket } };
+}
+
+export function validateMaterialEntry(body) {
+  const elnummer = String(body.elnummer || "").trim();
+  const typeUtstyr = String(body.typeUtstyr || "").trim();
+  const antall = Number(body.antall);
+  const harSjekket = Boolean(body.harSjekket);
+
+  if (!elnummer || !typeUtstyr || !Number.isFinite(antall)) {
+    return { ok: false, message: "El nummer, type utstyr og antall må fylles ut." };
+  }
+
+  if (!/^[0-9 ]{3,20}$/.test(elnummer)) {
+    return { ok: false, message: "El nummer kan bare inneholde tall og mellomrom." };
+  }
+
+  if (hasUnwantedWords(typeUtstyr)) {
+    return { ok: false, message: "FY deg, det er ikke lov :) !", code: "UNWANTED_WORDS" };
+  }
+
+  if (typeUtstyr.length > 80) {
+    return { ok: false, message: "Type utstyr er for lang." };
+  }
+
+  if (antall < 1 || antall > 999) {
+    return { ok: false, message: "Antall må være mellom 1 og 999." };
+  }
+
+  if (!harSjekket) {
+    return { ok: false, message: "Du må først sjekke i klasserommet og på lager." };
+  }
+
+  return {
+    ok: true,
+    entry: {
+      elnummer,
+      typeUtstyr,
+      antall: Math.round(antall),
+    },
+  };
 }
