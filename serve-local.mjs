@@ -9,6 +9,7 @@ const port = Number(process.env.PORT || 5190);
 const teacherUsername = "hamstr";
 const teacherPassword = "lokna";
 let queue = [];
+let materialList = [];
 
 const checklistValues = new Set([
   "Montørhåndbok",
@@ -22,29 +23,59 @@ const blockedNameWords = [
   "admin",
   "anonymous",
   "anonym",
+  "alkohol",
   "bitch",
+  "batman",
+  "captainamerica",
+  "cannabis",
+  "darthvader",
   "dritt",
+  "dop",
+  "drugs",
   "dust",
+  "gandalf",
+  "goku",
   "faen",
   "fitta",
   "fitte",
   "forbanna",
   "fuck",
+  "hasj",
   "helvete",
   "hitler",
   "hore",
   "idiot",
+  "ironman",
   "jævel",
   "javel",
+  "joker",
+  "kokain",
+  "krig",
   "kuk",
+  "marihuana",
+  "marijuana",
   "nazi",
   "neger",
+  "narkotika",
+  "naruto",
   "penis",
+  "pikachu",
+  "pokemon",
   "rasist",
+  "rus",
+  "rusmiddel",
+  "sauron",
   "satan",
   "sex",
+  "spiderman",
+  "superman",
   "test",
   "tiss",
+  "thor",
+  "voldemort",
+  "weed",
+  "ww2",
+  "yoda",
 ];
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -65,6 +96,10 @@ function publicQueue() {
   return queue
     .filter((entry) => !entry.hjulpet)
     .map(({ id, navn, opprettet }) => ({ id, navn, opprettet }));
+}
+
+function publicMaterialList() {
+  return materialList.filter((entry) => !entry.behandlet);
 }
 
 function anonymizeHelpedQueue(items) {
@@ -175,12 +210,69 @@ function validateStudentEntry(body) {
   return { ok: true, entry: { navn, gjelder, sjekket } };
 }
 
+function validateMaterialEntry(body) {
+  const elnummer = String(body.elnummer || "").trim();
+  const typeUtstyr = String(body.typeUtstyr || "").trim();
+  const antall = Number(body.antall);
+  const harSjekket = Boolean(body.harSjekket);
+
+  if (!elnummer || !typeUtstyr || !Number.isFinite(antall)) {
+    return { ok: false, message: "El nummer, type utstyr og antall må fylles ut." };
+  }
+
+  if (!/^[0-9 ]{3,20}$/.test(elnummer)) {
+    return { ok: false, message: "El nummer kan bare inneholde tall og mellomrom." };
+  }
+
+  if (hasUnwantedWords(typeUtstyr)) {
+    return { ok: false, message: "FY deg, det er ikke lov :) !", code: "UNWANTED_WORDS" };
+  }
+
+  if (typeUtstyr.length > 80) {
+    return { ok: false, message: "Type utstyr er for lang." };
+  }
+
+  if (antall < 1 || antall > 999) {
+    return { ok: false, message: "Antall må være mellom 1 og 999." };
+  }
+
+  if (!harSjekket) {
+    return { ok: false, message: "Du må først sjekke i klasserommet og på lager." };
+  }
+
+  return { ok: true, entry: { elnummer, typeUtstyr, antall: Math.round(antall) } };
+}
+
 createServer(async (request, response) => {
   const url = new URL(request.url, `http://${request.headers.host}`);
 
   try {
     if (request.method === "GET" && url.pathname === "/api/queue") {
       sendJson(response, 200, { queue: publicQueue() });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/material") {
+      sendJson(response, 200, { list: publicMaterialList() });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/material") {
+      const validation = validateMaterialEntry(await getRequestBody(request));
+
+      if (!validation.ok) {
+        sendJson(response, 400, { message: validation.message, code: validation.code });
+        return;
+      }
+
+      const entry = {
+        ...validation.entry,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        opprettet: new Date().toISOString(),
+        behandlet: false,
+      };
+      materialList.push(entry);
+      sendJson(response, 201, { entry, list: materialList });
       return;
     }
 
@@ -216,6 +308,36 @@ createServer(async (request, response) => {
 
       queue = anonymizeHelpedQueue(queue);
       sendJson(response, 200, { queue });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/teacher/material") {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lærer." });
+        return;
+      }
+
+      sendJson(response, 200, { list: materialList });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname.startsWith("/api/teacher/material/")) {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lærer." });
+        return;
+      }
+
+      const id = decodeURIComponent(url.pathname.replace("/api/teacher/material/", ""));
+      const entry = materialList.find((item) => item.id === id);
+
+      if (!entry) {
+        sendJson(response, 404, { message: "Fant ikke materiell i listen." });
+        return;
+      }
+
+      entry.behandlet = true;
+      entry.behandletTid = new Date().toISOString();
+      sendJson(response, 200, { ok: true });
       return;
     }
 
