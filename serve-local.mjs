@@ -10,6 +10,18 @@ const teacherUsername = "hamstr";
 const teacherPassword = "lokna";
 let queue = [];
 let materialList = [];
+let analytics = [];
+let pushSubscriptions = [];
+let appSettings = {
+  visibleMenus: {
+    handsopprekking: true,
+    materiell: true,
+    beregning: true,
+    beregningKabel: true,
+    beregningJording: true,
+    beregningVarmekabel: true,
+  },
+};
 
 const checklistValues = new Set([
   "Montørhåndbok",
@@ -100,6 +112,31 @@ function publicQueue() {
 
 function publicMaterialList() {
   return materialList.filter((entry) => !entry.behandlet);
+}
+
+function addAnalyticsEvent(event) {
+  const safeEvent = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type: String(event.type || "event").slice(0, 40),
+    category: String(event.category || "app").slice(0, 40),
+    target: String(event.target || "").slice(0, 80),
+    opprettet: new Date().toISOString(),
+  };
+  analytics = [...analytics, safeEvent].slice(-2000);
+  return safeEvent;
+}
+
+function addPushSubscription(subscription) {
+  const endpoint = String(subscription?.endpoint || "");
+
+  if (!endpoint) {
+    throw new Error("Mangler push-endepunkt.");
+  }
+
+  pushSubscriptions = [
+    ...pushSubscriptions.filter((item) => item.endpoint !== endpoint),
+    { ...subscription, opprettet: new Date().toISOString() },
+  ].slice(-20);
 }
 
 function anonymizeHelpedQueue(items) {
@@ -252,8 +289,32 @@ createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "GET" && url.pathname === "/api/settings") {
+      sendJson(response, 200, { settings: appSettings });
+      return;
+    }
+
     if (request.method === "GET" && url.pathname === "/api/material") {
       sendJson(response, 200, { list: publicMaterialList() });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/push/public-key") {
+      sendJson(response, 200, { publicKey: process.env.VAPID_PUBLIC_KEY || "" });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/analytics") {
+      const body = await getRequestBody(request);
+      const allowedTypes = new Set(["visit", "nav_click", "calculation_completed"]);
+
+      if (!allowedTypes.has(String(body.type || ""))) {
+        sendJson(response, 400, { message: "Ugyldig statistikkhendelse." });
+        return;
+      }
+
+      const event = addAnalyticsEvent(body);
+      sendJson(response, 201, { event });
       return;
     }
 
@@ -311,6 +372,32 @@ createServer(async (request, response) => {
       return;
     }
 
+    if (url.pathname === "/api/teacher/settings") {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lærer." });
+        return;
+      }
+
+      if (request.method === "GET") {
+        sendJson(response, 200, { settings: appSettings });
+        return;
+      }
+
+      if (request.method === "POST") {
+        const body = await getRequestBody(request);
+        appSettings = {
+          ...appSettings,
+          ...body,
+          visibleMenus: {
+            ...appSettings.visibleMenus,
+            ...(body.visibleMenus || {}),
+          },
+        };
+        sendJson(response, 200, { settings: appSettings });
+        return;
+      }
+    }
+
     if (request.method === "GET" && url.pathname === "/api/teacher/material") {
       if (!isTeacherAuthorized(request)) {
         sendJson(response, 401, { message: "Ikke innlogget som lærer." });
@@ -318,6 +405,40 @@ createServer(async (request, response) => {
       }
 
       sendJson(response, 200, { list: materialList });
+      return;
+    }
+
+    if (request.method === "GET" && url.pathname === "/api/teacher/analytics") {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lÃ¦rer." });
+        return;
+      }
+
+      sendJson(response, 200, { analytics });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/teacher/push/subscribe") {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lÃ¦rer." });
+        return;
+      }
+
+      const body = await getRequestBody(request);
+      addPushSubscription(body.subscription);
+      sendJson(response, 201, { ok: true, count: pushSubscriptions.length });
+      return;
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/teacher/push/unsubscribe") {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lÃ¦rer." });
+        return;
+      }
+
+      const body = await getRequestBody(request);
+      pushSubscriptions = pushSubscriptions.filter((subscription) => subscription.endpoint !== body.endpoint);
+      sendJson(response, 200, { ok: true, count: pushSubscriptions.length });
       return;
     }
 
