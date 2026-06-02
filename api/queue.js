@@ -6,6 +6,7 @@ import {
   validateStudentEntry,
   writeQueue,
 } from "./_queueStore.js";
+import { notifyTeacherNewQueueEntry } from "./_push.js";
 
 export default async function handler(request, response) {
   try {
@@ -39,6 +40,7 @@ export default async function handler(request, response) {
 
       queue.push(entry);
       await writeQueue(queue);
+      await notifyTeacherNewQueueEntry(publicQueue(queue).length);
 
       sendJson(response, 201, {
         entry: publicQueue([entry])[0],

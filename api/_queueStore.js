@@ -1,5 +1,18 @@
 const QUEUE_KEY = "handsopprekking:queue";
 const MATERIAL_KEY = "handsopprekking:material";
+const SETTINGS_KEY = "handsopprekking:settings";
+const ANALYTICS_KEY = "handsopprekking:analytics";
+const PUSH_SUBSCRIPTIONS_KEY = "handsopprekking:pushSubscriptions";
+export const defaultAppSettings = {
+  visibleMenus: {
+    handsopprekking: true,
+    materiell: true,
+    beregning: true,
+    beregningKabel: true,
+    beregningJording: true,
+    beregningVarmekabel: true,
+  },
+};
 const CHECKLIST_VALUES = new Set([
   "Montørhåndbok",
   "OneNote",
@@ -155,6 +168,120 @@ export async function readMaterialList() {
 
 export async function writeMaterialList(list) {
   await redis(["SET", MATERIAL_KEY, JSON.stringify(list)]);
+}
+
+export async function readAppSettings() {
+  const rawSettings = await redis(["GET", SETTINGS_KEY]);
+
+  if (!rawSettings) {
+    return defaultAppSettings;
+  }
+
+  try {
+    const settings = JSON.parse(rawSettings);
+    return {
+      ...defaultAppSettings,
+      ...settings,
+      visibleMenus: {
+        ...defaultAppSettings.visibleMenus,
+        ...(settings.visibleMenus || {}),
+      },
+    };
+  } catch {
+    return defaultAppSettings;
+  }
+}
+
+export async function writeAppSettings(settings) {
+  const nextSettings = {
+    ...defaultAppSettings,
+    ...settings,
+    visibleMenus: {
+      ...defaultAppSettings.visibleMenus,
+      ...(settings.visibleMenus || {}),
+    },
+  };
+  await redis(["SET", SETTINGS_KEY, JSON.stringify(nextSettings)]);
+  return nextSettings;
+}
+
+export async function readAnalytics() {
+  const rawAnalytics = await redis(["GET", ANALYTICS_KEY]);
+
+  if (!rawAnalytics) {
+    return [];
+  }
+
+  try {
+    const analytics = JSON.parse(rawAnalytics);
+    return Array.isArray(analytics) ? analytics : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function writeAnalytics(analytics) {
+  await redis(["SET", ANALYTICS_KEY, JSON.stringify(analytics.slice(-2000))]);
+}
+
+export async function addAnalyticsEvent(event) {
+  const analytics = await readAnalytics();
+  const safeEvent = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    type: String(event.type || "event").slice(0, 40),
+    category: String(event.category || "app").slice(0, 40),
+    target: String(event.target || "").slice(0, 80),
+    opprettet: new Date().toISOString(),
+  };
+  const nextAnalytics = [...analytics, safeEvent].slice(-2000);
+  await writeAnalytics(nextAnalytics);
+  return safeEvent;
+}
+
+export async function readPushSubscriptions() {
+  const rawSubscriptions = await redis(["GET", PUSH_SUBSCRIPTIONS_KEY]);
+
+  if (!rawSubscriptions) {
+    return [];
+  }
+
+  try {
+    const subscriptions = JSON.parse(rawSubscriptions);
+    return Array.isArray(subscriptions) ? subscriptions : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function writePushSubscriptions(subscriptions) {
+  await redis(["SET", PUSH_SUBSCRIPTIONS_KEY, JSON.stringify(subscriptions.slice(-20))]);
+}
+
+export async function addPushSubscription(subscription) {
+  const subscriptions = await readPushSubscriptions();
+  const endpoint = String(subscription?.endpoint || "");
+
+  if (!endpoint) {
+    throw new Error("Mangler push-endepunkt.");
+  }
+
+  const nextSubscriptions = [
+    ...subscriptions.filter((item) => item.endpoint !== endpoint),
+    {
+      ...subscription,
+      opprettet: new Date().toISOString(),
+    },
+  ].slice(-20);
+
+  await writePushSubscriptions(nextSubscriptions);
+  return nextSubscriptions.length;
+}
+
+export async function removePushSubscription(endpoint) {
+  const subscriptions = await readPushSubscriptions();
+  const nextSubscriptions = subscriptions.filter((subscription) => subscription.endpoint !== endpoint);
+  await writePushSubscriptions(nextSubscriptions);
+  return nextSubscriptions.length;
 }
 
 export function publicMaterialList(list) {
