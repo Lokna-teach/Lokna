@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.vercel/
+npm-debug.log*
+vite-dev.*.log
+api-server.*.log
+.env
+.env.local
+data/

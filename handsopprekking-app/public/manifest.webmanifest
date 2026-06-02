@@ -1,0 +1,18 @@
+{
+  "name": "Lokna Håndsopprekking",
+  "short_name": "Lokna",
+  "description": "Klasseromskø, materiell og beregning for undervisning.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#E4E4E7",
+  "theme_color": "#18181B",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
