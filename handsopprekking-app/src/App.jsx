@@ -2279,8 +2279,8 @@ function LaererPage({
 
       {viserMenyvalg ? (
         <>
-          <TeacherVisibilitySection innstillinger={innstillinger} onToggleVisibility={onToggleVisibility} />
           <TeacherPushSection />
+          <TeacherVisibilitySection innstillinger={innstillinger} onToggleVisibility={onToggleVisibility} />
         </>
       ) : viserMateriell ? (
         <TeacherMaterialSection list={materiellList} feil={materiellFeil} onMerkMateriell={onMerkMateriell} />
