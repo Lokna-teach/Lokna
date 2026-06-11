@@ -18,7 +18,7 @@ export function NumberInput({ label, value, onChange, suffix, step = "0.01", hel
     <label className="field">
       <span>{label}</span>
       <div className="input-shell">
-        <input type="number" step={step} value={value} onChange={(event) => onChange(event.target.value)} />
+        <input inputMode="decimal" step={step} value={value} onChange={(event) => onChange(event.target.value)} />
         {suffix && <small>{suffix}</small>}
       </div>
       {helper && <p className="helper">{helper}</p>}

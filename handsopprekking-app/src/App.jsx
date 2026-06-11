@@ -1655,9 +1655,55 @@ function ComingSoonCalculation({ type }) {
   );
 }
 
+class CalculationErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error) {
+    console.error("Beregning feilet:", error);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <section className="page">
+          <section className="card">
+            <div className="section-heading">
+              <div className="section-icon">
+                <Info size={22} />
+              </div>
+              <div>
+                <p className="portal-eyebrow">Beregning</p>
+                <h2>Kunne ikke åpne beregningen</h2>
+                <p className="muted-text">
+                  Last inn siden på nytt. Hvis feilen fortsetter, er den fanget slik at resten av appen fortsatt virker.
+                </p>
+              </div>
+            </div>
+            <button type="button" className="primary-button compact-button" onClick={() => window.location.reload()}>
+              Last inn på nytt
+            </button>
+          </section>
+        </section>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 function BeregningPage({ aktivSide }) {
-  if (aktivSide === "beregning-kabel") return <KabelOgVernPage />;
-  return <ComingSoonCalculation type={aktivSide} />;
+  return (
+    <CalculationErrorBoundary key={aktivSide}>
+      {aktivSide === "beregning-kabel" ? <KabelOgVernPage /> : <ComingSoonCalculation type={aktivSide} />}
+    </CalculationErrorBoundary>
+  );
 }
 
 function HandsopprekkingPage({ ko, onLeggTil, koFeil, sistOppdatert }) {
