@@ -1656,7 +1656,7 @@ function ComingSoonCalculation({ type }) {
 }
 
 function BeregningPage({ aktivSide }) {
-  if (aktivSide === "beregning-kabel") return <KabelOgVernOriginalPage />;
+  if (aktivSide === "beregning-kabel") return <KabelOgVernPage />;
   return <ComingSoonCalculation type={aktivSide} />;
 }
 
