@@ -437,6 +437,17 @@ createServer(async (request, response) => {
         return;
       }
 
+      if (body.action === "test") {
+        sendJson(response, 200, {
+          ok: pushSubscriptions.length > 0,
+          sent: pushSubscriptions.length,
+          skipped: true,
+          subscriptions: pushSubscriptions.length,
+          errors: ["Lokal preview simulerer testvarsel. Test ekte push på Vercel."],
+        });
+        return;
+      }
+
       sendJson(response, 400, { message: "Ukjent push-handling." });
       return;
     }

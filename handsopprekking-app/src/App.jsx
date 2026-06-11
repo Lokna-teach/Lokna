@@ -404,6 +404,11 @@ async function subscribeTeacherPush() {
       applicationServerKey: urlBase64ToUint8Array(publicKey),
     }));
 
+  await saveTeacherPushSubscription(subscription);
+  return subscription;
+}
+
+async function saveTeacherPushSubscription(subscription) {
   const response = await fetch("/api/teacher/push", {
     method: "POST",
     headers: {
@@ -439,6 +444,19 @@ async function unsubscribeTeacherPush() {
   });
 
   await subscription.unsubscribe();
+}
+
+async function sendTeacherPushTest() {
+  const response = await fetch("/api/teacher/push", {
+    method: "POST",
+    headers: {
+      Authorization: laererAuthHeader(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ action: "test" }),
+  });
+
+  return readApiResponse(response, "Kunne ikke sende testvarsel.");
 }
 
 function normalizeSettings(settings) {
@@ -2061,7 +2079,17 @@ function TeacherPushSection() {
       setStotte("ja");
       const registration = await registerServiceWorker();
       const subscription = await registration?.pushManager.getSubscription();
-      setAktiv(Boolean(subscription));
+      if (subscription) {
+        try {
+          await saveTeacherPushSubscription(subscription);
+          setAktiv(true);
+        } catch {
+          setAktiv(false);
+        }
+        return;
+      }
+
+      setAktiv(false);
     }
 
     sjekkStatus();
@@ -2097,6 +2125,27 @@ function TeacherPushSection() {
     }
   }
 
+  async function handleTestvarsel() {
+    setJobber(true);
+    setMelding("");
+
+    try {
+      const result = await sendTeacherPushTest();
+      if (result.sent > 0) {
+        setMelding(`Testvarsel sendt til ${result.sent} enhet${result.sent === 1 ? "" : "er"}.`);
+      } else if (result.subscriptions === 0) {
+        setMelding("Ingen mobil er registrert for pushvarsler. Slå av og på varsler på mobilen.");
+      } else {
+        const errorText = Array.isArray(result.errors) && result.errors.length ? ` ${result.errors.join(" ")}` : "";
+        setMelding(`Fant ${result.subscriptions} registrert enhet, men ingen varsel ble sendt.${errorText}`);
+      }
+    } catch (error) {
+      setMelding(error.message || "Kunne ikke sende testvarsel.");
+    } finally {
+      setJobber(false);
+    }
+  }
+
   return (
     <section className="card">
       <div className="section-heading">
@@ -2115,10 +2164,16 @@ function TeacherPushSection() {
       ) : (
         <div className="teacher-actions">
           {aktiv ? (
-            <button type="button" className="danger-button" onClick={handleDeaktiver} disabled={jobber}>
-              <BellOff size={18} />
-              Slå av varsler
-            </button>
+            <>
+              <button type="button" className="primary-button compact-button" onClick={handleTestvarsel} disabled={jobber}>
+                <Bell size={18} />
+                Send testvarsel
+              </button>
+              <button type="button" className="danger-button" onClick={handleDeaktiver} disabled={jobber}>
+                <BellOff size={18} />
+                Slå av varsler
+              </button>
+            </>
           ) : (
             <button type="button" className="primary-button compact-button" onClick={handleAktiver} disabled={jobber}>
               <Bell size={18} />

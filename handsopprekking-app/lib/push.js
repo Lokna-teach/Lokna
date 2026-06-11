@@ -26,31 +26,29 @@ function configureWebPush() {
   return true;
 }
 
-export async function notifyTeacherNewQueueEntry(queueLength) {
+async function sendTeacherPush(payload) {
   try {
     if (!configureWebPush()) {
-      return { sent: 0, skipped: true };
+      return { sent: 0, skipped: true, subscriptions: 0, errors: ["VAPID-nøkler mangler."] };
     }
 
     const subscriptions = await readPushSubscriptions();
-    const payload = JSON.stringify({
-      title: "Ny håndsopprekking",
-      body: `${queueLength} ${queueLength === 1 ? "elev står" : "elever står"} i kø.`,
-      url: "/",
-    });
+    const message = JSON.stringify(payload);
 
     let sent = 0;
+    const errors = [];
     const activeSubscriptions = [];
 
     await Promise.all(
       subscriptions.map(async (subscription) => {
         try {
-          await webPush.sendNotification(subscription, payload);
+          await webPush.sendNotification(subscription, message);
           sent += 1;
           activeSubscriptions.push(subscription);
         } catch (error) {
           if (![404, 410].includes(error.statusCode)) {
             activeSubscriptions.push(subscription);
+            errors.push(error.message || "Ukjent pushfeil.");
           }
         }
       })
@@ -60,9 +58,30 @@ export async function notifyTeacherNewQueueEntry(queueLength) {
       await writePushSubscriptions(activeSubscriptions);
     }
 
-    return { sent, skipped: false };
+    return {
+      sent,
+      skipped: false,
+      subscriptions: subscriptions.length,
+      errors: [...new Set(errors)].slice(0, 3),
+    };
   } catch (error) {
     console.warn("Kunne ikke sende pushvarsel:", error.message);
-    return { sent: 0, skipped: true, error: error.message };
+    return { sent: 0, skipped: true, subscriptions: 0, errors: [error.message || "Ukjent pushfeil."] };
   }
+}
+
+export async function notifyTeacherNewQueueEntry(queueLength) {
+  return sendTeacherPush({
+    title: "Ny håndsopprekking",
+    body: `${queueLength} ${queueLength === 1 ? "elev står" : "elever står"} i kø.`,
+    url: "/",
+  });
+}
+
+export async function sendTeacherTestNotification() {
+  return sendTeacherPush({
+    title: "Testvarsel fra Lokna",
+    body: "Pushvarsler fungerer på denne enheten.",
+    url: "/",
+  });
 }

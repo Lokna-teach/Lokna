@@ -1,4 +1,5 @@
 import { addPushSubscription, isTeacherAuthorized, removePushSubscription, sendJson } from "../../lib/store.js";
+import { sendTeacherTestNotification } from "../../lib/push.js";
 
 function requireTeacher(request, response) {
   if (isTeacherAuthorized(request)) return true;
@@ -38,6 +39,12 @@ export default async function handler(request, response) {
 
       const count = await removePushSubscription(endpoint);
       sendJson(response, 200, { ok: true, count });
+      return;
+    }
+
+    if (action === "test") {
+      const result = await sendTeacherTestNotification();
+      sendJson(response, 200, { ok: result.sent > 0, ...result });
       return;
     }
 
