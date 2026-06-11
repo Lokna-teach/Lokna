@@ -32,7 +32,7 @@ import {
   StatusLine,
   StepCard,
 } from "./components/ui.jsx";
-import { CALC_STORAGE_KEY, defaultAppSettings, TEACHER_PASSWORD, TEACHER_STORAGE_KEY, TEACHER_USERNAME } from "./config.js";
+import { defaultAppSettings, TEACHER_PASSWORD, TEACHER_STORAGE_KEY, TEACHER_USERNAME } from "./config.js";
 
 const CLASSROOM_ALERT_STORAGE_KEY = "loknaClassroomAlertEnabled";
 
@@ -1016,7 +1016,6 @@ function BeregningLogin({ onLogin }) {
     event.preventDefault();
 
     if (brukernavn.trim().toLowerCase() === TEACHER_USERNAME && passord === TEACHER_PASSWORD) {
-      sessionStorage.setItem(CALC_STORAGE_KEY, "true");
       onLogin();
       return;
     }
@@ -2454,9 +2453,6 @@ export default function App() {
   const [erLaererInnlogget, setErLaererInnlogget] = useState(
     () => sessionStorage.getItem(TEACHER_STORAGE_KEY) === "true"
   );
-  const [erBeregningInnlogget, setErBeregningInnlogget] = useState(
-    () => sessionStorage.getItem(CALC_STORAGE_KEY) === "true"
-  );
   const [elevKo, setElevKo] = useState([]);
   const [laererKo, setLaererKo] = useState([]);
   const [materiellList, setMateriellList] = useState([]);
@@ -2779,8 +2775,6 @@ export default function App() {
             onToggleVisibility={toggleVisibility}
             onTilbakestillKo={tilbakestillKo}
           />
-        ) : aktivSide.startsWith("beregning-") && !erBeregningInnlogget ? (
-          <BeregningLogin onLogin={() => setErBeregningInnlogget(true)} />
         ) : aktivSide.startsWith("beregning-") ? (
           <BeregningPage aktivSide={aktivSide} />
         ) : aktivSide === "materiell" ? (
