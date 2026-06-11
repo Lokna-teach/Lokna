@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart3,
   Bell,
@@ -33,6 +33,8 @@ import {
   StepCard,
 } from "./components/ui.jsx";
 import { CALC_STORAGE_KEY, defaultAppSettings, TEACHER_PASSWORD, TEACHER_STORAGE_KEY, TEACHER_USERNAME } from "./config.js";
+
+const CLASSROOM_ALERT_STORAGE_KEY = "loknaClassroomAlertEnabled";
 
 const menuVisibilityChoices = [
   { id: "handsopprekking", navn: "Håndsopprekking", icon: Hand },
@@ -457,6 +459,52 @@ async function sendTeacherPushTest() {
   });
 
   return readApiResponse(response, "Kunne ikke sende testvarsel.");
+}
+
+function playClassroomAlertSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  const context = new AudioContextClass();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(880, context.currentTime);
+  oscillator.frequency.setValueAtTime(660, context.currentTime + 0.12);
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.2, context.currentTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.35);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.38);
+  window.setTimeout(() => context.close(), 600);
+}
+
+function varsleNyElevLokalt(nyeElever, totalIKo) {
+  try {
+    playClassroomAlertSound();
+  } catch {
+    // Lyd er bare ekstra hjelp. Køflyten må ikke stoppe hvis nettleseren blokkerer lyd.
+  }
+
+  if ("vibrate" in navigator) {
+    navigator.vibrate([180, 80, 180]);
+  }
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    const body =
+      nyeElever === 1
+        ? `${totalIKo} ${totalIKo === 1 ? "elev står" : "elever står"} i kø.`
+        : `${nyeElever} nye elever. ${totalIKo} står i kø.`;
+    new Notification("Ny håndsopprekking", {
+      body,
+      icon: "/icon.svg",
+      tag: "lokna-klasseromsvarsel",
+    });
+  }
 }
 
 function normalizeSettings(settings) {
@@ -2188,6 +2236,34 @@ function TeacherPushSection() {
   );
 }
 
+function TeacherClassroomAlertSection({ aktiv, onToggle }) {
+  return (
+    <section className="card">
+      <div className="section-heading">
+        <div className="section-icon">
+          {aktiv ? <Bell size={22} /> : <BellOff size={22} />}
+        </div>
+        <div>
+          <p className="portal-eyebrow">Klasserom</p>
+          <h2>Varsel når appen er åpen</h2>
+          <p className="muted-text">Gir lyd, vibrasjon og nettleservarsel når en ny elev legger seg i kø.</p>
+        </div>
+      </div>
+      <div className="teacher-actions">
+        <button type="button" className="primary-button compact-button" onClick={onToggle}>
+          {aktiv ? <BellOff size={18} /> : <Bell size={18} />}
+          {aktiv ? "Slå av klasseromsvarsel" : "Aktiver klasseromsvarsel"}
+        </button>
+      </div>
+      <p className={aktiv ? "queue-message" : "queue-error"}>
+        {aktiv
+          ? "Klasseromsvarsel er aktivt så lenge lærervinduet står åpent."
+          : "Dette virker uten push, men krever at lærervinduet står åpent."}
+      </p>
+    </section>
+  );
+}
+
 function TeacherStatisticsSection({ ko, materiellList, analytics }) {
   const [aktivStatistikk, setAktivStatistikk] = useState("sammendrag");
   const hjulpne = ko.filter((innslag) => innslag.hjulpet && innslag.hjulpetTid);
@@ -2283,7 +2359,9 @@ function LaererPage({
   materiellFeil,
   materiellList,
   innstillinger,
+  klasseromVarselAktivt,
   onByttLaererVisning,
+  onToggleKlasseromVarsel,
   onMerkHjulpet,
   onMerkMateriell,
   onToggleVisibility,
@@ -2334,6 +2412,7 @@ function LaererPage({
 
       {viserMenyvalg ? (
         <>
+          <TeacherClassroomAlertSection aktiv={klasseromVarselAktivt} onToggle={onToggleKlasseromVarsel} />
           <TeacherPushSection />
           <TeacherVisibilitySection innstillinger={innstillinger} onToggleVisibility={onToggleVisibility} />
         </>
@@ -2389,6 +2468,10 @@ export default function App() {
   const [innstillinger, setInnstillinger] = useState(defaultAppSettings);
   const [laererVisning, setLaererVisning] = useState("ko");
   const [sistOppdatert, setSistOppdatert] = useState(null);
+  const [klasseromVarselAktivt, setKlasseromVarselAktivt] = useState(
+    () => localStorage.getItem(CLASSROOM_ALERT_STORAGE_KEY) === "true"
+  );
+  const laererKoVarselRef = useRef({ klar: false, aktiveIder: new Set() });
 
   useEffect(() => {
     loggStatistikk("visit", "app", "besok");
@@ -2475,6 +2558,17 @@ export default function App() {
           hentLaererMateriellFraApi(),
           hentLaererAnalyticsFraApi(),
         ]);
+        const aktivKo = ko.filter((innslag) => !innslag.hjulpet);
+        const nyeInnslag = aktivKo.filter((innslag) => !laererKoVarselRef.current.aktiveIder.has(innslag.id));
+
+        if (klasseromVarselAktivt && laererKoVarselRef.current.klar && nyeInnslag.length > 0) {
+          varsleNyElevLokalt(nyeInnslag.length, aktivKo.length);
+        }
+
+        laererKoVarselRef.current = {
+          klar: true,
+          aktiveIder: new Set(aktivKo.map((innslag) => innslag.id)),
+        };
         setLaererKo(ko);
         setMateriellList(materiell);
         setAnalytics(analyticsData);
@@ -2489,6 +2583,12 @@ export default function App() {
     oppdaterLaererKo();
     const intervall = window.setInterval(oppdaterLaererKo, 15000);
     return () => window.clearInterval(intervall);
+  }, [erLaererInnlogget, klasseromVarselAktivt]);
+
+  useEffect(() => {
+    if (!erLaererInnlogget) {
+      laererKoVarselRef.current = { klar: false, aktiveIder: new Set() };
+    }
   }, [erLaererInnlogget]);
 
   function velgElevSide(side) {
@@ -2517,6 +2617,25 @@ export default function App() {
       setInnstillinger(savedSettings);
     } catch (error) {
       setLaererKoFeil(error.message || "Kunne ikke lagre menyvalg.");
+    }
+  }
+
+  async function toggleKlasseromVarsel() {
+    const nextValue = !klasseromVarselAktivt;
+
+    if (nextValue && "Notification" in window && Notification.permission === "default") {
+      await Notification.requestPermission();
+    }
+
+    setKlasseromVarselAktivt(nextValue);
+    localStorage.setItem(CLASSROOM_ALERT_STORAGE_KEY, String(nextValue));
+
+    if (nextValue) {
+      try {
+        playClassroomAlertSound();
+      } catch {
+        // Noen nettlesere tillater ikke lyd før neste brukerhandling.
+      }
     }
   }
 
@@ -2651,8 +2770,10 @@ export default function App() {
             materiellFeil={laererMateriellFeil}
             materiellList={materiellList}
             innstillinger={innstillinger}
+            klasseromVarselAktivt={klasseromVarselAktivt}
             sistOppdatert={sistOppdatert}
             onByttLaererVisning={setLaererVisning}
+            onToggleKlasseromVarsel={toggleKlasseromVarsel}
             onMerkHjulpet={merkSomHjulpet}
             onMerkMateriell={merkMateriellOrdnet}
             onToggleVisibility={toggleVisibility}
