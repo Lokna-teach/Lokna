@@ -3,6 +3,7 @@ const MATERIAL_KEY = "handsopprekking:material";
 const SETTINGS_KEY = "handsopprekking:settings";
 const ANALYTICS_KEY = "handsopprekking:analytics";
 const PUSH_SUBSCRIPTIONS_KEY = "handsopprekking:pushSubscriptions";
+
 export const defaultAppSettings = {
   visibleMenus: {
     handsopprekking: true,
@@ -13,6 +14,7 @@ export const defaultAppSettings = {
     beregningVarmekabel: true,
   },
 };
+
 const CHECKLIST_VALUES = new Set([
   "Montørhåndbok",
   "OneNote",
@@ -134,11 +136,7 @@ export function isTeacherAuthorized(request) {
 
 export async function readQueue() {
   const rawQueue = await redis(["GET", QUEUE_KEY]);
-
-  if (!rawQueue) {
-    return [];
-  }
-
+  if (!rawQueue) return [];
   try {
     const queue = JSON.parse(rawQueue);
     return Array.isArray(queue) ? queue : [];
@@ -153,11 +151,7 @@ export async function writeQueue(queue) {
 
 export async function readMaterialList() {
   const rawList = await redis(["GET", MATERIAL_KEY]);
-
-  if (!rawList) {
-    return [];
-  }
-
+  if (!rawList) return [];
   try {
     const list = JSON.parse(rawList);
     return Array.isArray(list) ? list : [];
@@ -172,11 +166,7 @@ export async function writeMaterialList(list) {
 
 export async function readAppSettings() {
   const rawSettings = await redis(["GET", SETTINGS_KEY]);
-
-  if (!rawSettings) {
-    return defaultAppSettings;
-  }
-
+  if (!rawSettings) return defaultAppSettings;
   try {
     const settings = JSON.parse(rawSettings);
     return {
@@ -207,11 +197,7 @@ export async function writeAppSettings(settings) {
 
 export async function readAnalytics() {
   const rawAnalytics = await redis(["GET", ANALYTICS_KEY]);
-
-  if (!rawAnalytics) {
-    return [];
-  }
-
+  if (!rawAnalytics) return [];
   try {
     const analytics = JSON.parse(rawAnalytics);
     return Array.isArray(analytics) ? analytics : [];
@@ -240,11 +226,7 @@ export async function addAnalyticsEvent(event) {
 
 export async function readPushSubscriptions() {
   const rawSubscriptions = await redis(["GET", PUSH_SUBSCRIPTIONS_KEY]);
-
-  if (!rawSubscriptions) {
-    return [];
-  }
-
+  if (!rawSubscriptions) return [];
   try {
     const subscriptions = JSON.parse(rawSubscriptions);
     return Array.isArray(subscriptions) ? subscriptions : [];
@@ -260,17 +242,11 @@ export async function writePushSubscriptions(subscriptions) {
 export async function addPushSubscription(subscription) {
   const subscriptions = await readPushSubscriptions();
   const endpoint = String(subscription?.endpoint || "");
-
-  if (!endpoint) {
-    throw new Error("Mangler push-endepunkt.");
-  }
+  if (!endpoint) throw new Error("Mangler push-endepunkt.");
 
   const nextSubscriptions = [
     ...subscriptions.filter((item) => item.endpoint !== endpoint),
-    {
-      ...subscription,
-      opprettet: new Date().toISOString(),
-    },
+    { ...subscription, opprettet: new Date().toISOString() },
   ].slice(-20);
 
   await writePushSubscriptions(nextSubscriptions);
@@ -295,14 +271,7 @@ export function publicQueue(queue) {
 }
 
 export function anonymizeHelpedQueue(queue) {
-  return queue.map((entry) =>
-    entry.hjulpet
-      ? {
-          ...entry,
-          navn: "Anonym elev",
-        }
-      : entry
-  );
+  return queue.map((entry) => (entry.hjulpet ? { ...entry, navn: "Anonym elev" } : entry));
 }
 
 export function normalizeName(navn) {
@@ -328,17 +297,11 @@ function hasUnwantedWords(value) {
 function validateStudentName(navn) {
   const trimmed = String(navn || "").trim();
   const normalized = normalizeForFilter(trimmed);
-
   if (trimmed.length < 2) return "Skriv inn et ekte navn.";
   if (trimmed.length > 20) return "Navnet kan maks være 20 bokstaver.";
-  if (!/^[a-zA-ZæøåÆØÅ ]+$/.test(trimmed)) {
-    return "Bruk kun bokstaver i navnet.";
-  }
+  if (!/^[a-zA-ZæøåÆØÅ ]+$/.test(trimmed)) return "Bruk kun bokstaver i navnet.";
   if (/(.)\1{3,}/.test(normalized)) return "Bruk et ekte navn.";
-  if (hasUnwantedWords(trimmed)) {
-    return "Bruk et ordentlig navn.";
-  }
-
+  if (hasUnwantedWords(trimmed)) return "Bruk et ordentlig navn.";
   return "";
 }
 
@@ -364,24 +327,11 @@ export function validateStudentEntry(body) {
   if (hasUnwantedWords(navn) || hasUnwantedWords(gjelder)) {
     return { ok: false, message: "FY deg, det er ikke lov :) !", code: "UNWANTED_WORDS" };
   }
-
   const nameError = validateStudentName(navn);
-  if (nameError) {
-    return { ok: false, message: nameError };
-  }
-
-  if (countWords(gjelder) < 7) {
-    return { ok: false, message: "Skriv minst 7 ord om hva du trenger hjelp til." };
-  }
-
-  if (sjekket.length !== CHECKLIST_VALUES.size) {
-    return { ok: false, message: "Alle punktene i sjekket først må krysses av." };
-  }
-
-  if (gjelder.length > 1000) {
-    return { ok: false, message: "Teksten er for lang." };
-  }
-
+  if (nameError) return { ok: false, message: nameError };
+  if (countWords(gjelder) < 7) return { ok: false, message: "Skriv minst 7 ord om hva du trenger hjelp til." };
+  if (sjekket.length !== CHECKLIST_VALUES.size) return { ok: false, message: "Alle punktene i sjekket først må krysses av." };
+  if (gjelder.length > 1000) return { ok: false, message: "Teksten er for lang." };
   return { ok: true, entry: { navn, gjelder, sjekket } };
 }
 
@@ -394,33 +344,10 @@ export function validateMaterialEntry(body) {
   if (!elnummer || !typeUtstyr || !Number.isFinite(antall)) {
     return { ok: false, message: "El nummer, type utstyr og antall må fylles ut." };
   }
-
-  if (!/^[0-9 ]{3,20}$/.test(elnummer)) {
-    return { ok: false, message: "El nummer kan bare inneholde tall og mellomrom." };
-  }
-
-  if (hasUnwantedWords(typeUtstyr)) {
-    return { ok: false, message: "FY deg, det er ikke lov :) !", code: "UNWANTED_WORDS" };
-  }
-
-  if (typeUtstyr.length > 80) {
-    return { ok: false, message: "Type utstyr er for lang." };
-  }
-
-  if (antall < 1 || antall > 999) {
-    return { ok: false, message: "Antall må være mellom 1 og 999." };
-  }
-
-  if (!harSjekket) {
-    return { ok: false, message: "Du må først sjekke i klasserommet og på lager." };
-  }
-
-  return {
-    ok: true,
-    entry: {
-      elnummer,
-      typeUtstyr,
-      antall: Math.round(antall),
-    },
-  };
+  if (!/^[0-9 ]{3,20}$/.test(elnummer)) return { ok: false, message: "El nummer kan bare inneholde tall og mellomrom." };
+  if (hasUnwantedWords(typeUtstyr)) return { ok: false, message: "FY deg, det er ikke lov :) !", code: "UNWANTED_WORDS" };
+  if (typeUtstyr.length > 80) return { ok: false, message: "Type utstyr er for lang." };
+  if (antall < 1 || antall > 999) return { ok: false, message: "Antall må være mellom 1 og 999." };
+  if (!harSjekket) return { ok: false, message: "Du må først sjekke i klasserommet og på lager." };
+  return { ok: true, entry: { elnummer, typeUtstyr, antall: Math.round(antall) } };
 }

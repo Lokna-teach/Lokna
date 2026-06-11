@@ -6,7 +6,7 @@ export function FyModal({ onClose }) {
       <div className="fy-modal">
         <h2 id="fy-modal-title">FY deg, det er ikke lov :) !</h2>
         <button type="button" className="primary-button" onClick={onClose}>
-          Ok, jeg skal vÃ¦re snill
+          Ok, jeg skal være snill
         </button>
       </div>
     </div>

@@ -374,25 +374,25 @@ async function registerServiceWorker() {
 
 async function hentVapidPublicKey() {
   const response = await fetch("/api/push/public-key", { cache: "no-store" });
-  const data = await readApiResponse(response, "Kunne ikke hente varselnÃ¸kkel.");
+  const data = await readApiResponse(response, "Kunne ikke hente varselnøkkel.");
   return data.publicKey || "";
 }
 
 async function subscribeTeacherPush() {
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
-    throw new Error("Denne nettleseren stÃ¸tter ikke pushvarsler.");
+    throw new Error("Denne nettleseren støtter ikke pushvarsler.");
   }
 
   const permission = await Notification.requestPermission();
 
   if (permission !== "granted") {
-    throw new Error("Varsler er ikke tillatt pÃ¥ denne enheten.");
+    throw new Error("Varsler er ikke tillatt på denne enheten.");
   }
 
   const publicKey = await hentVapidPublicKey();
 
   if (!publicKey) {
-    throw new Error("VAPID_PUBLIC_KEY mangler pÃ¥ serveren.");
+    throw new Error("VAPID_PUBLIC_KEY mangler på serveren.");
   }
 
   const registration = await registerServiceWorker();
@@ -404,13 +404,13 @@ async function subscribeTeacherPush() {
       applicationServerKey: urlBase64ToUint8Array(publicKey),
     }));
 
-  const response = await fetch("/api/teacher/push/subscribe", {
+  const response = await fetch("/api/teacher/push", {
     method: "POST",
     headers: {
       Authorization: laererAuthHeader(),
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ subscription }),
+    body: JSON.stringify({ action: "subscribe", subscription }),
   });
 
   await readApiResponse(response, "Kunne ikke aktivere varsler.");
@@ -429,13 +429,13 @@ async function unsubscribeTeacherPush() {
     return;
   }
 
-  await fetch("/api/teacher/push/unsubscribe", {
+  await fetch("/api/teacher/push", {
     method: "POST",
     headers: {
       Authorization: laererAuthHeader(),
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ endpoint: subscription.endpoint }),
+    body: JSON.stringify({ action: "unsubscribe", endpoint: subscription.endpoint }),
   });
 
   await subscription.unsubscribe();
@@ -2074,7 +2074,7 @@ function TeacherPushSection() {
     try {
       await subscribeTeacherPush();
       setAktiv(true);
-      setMelding("Varsler er aktivert pÃ¥ denne enheten.");
+      setMelding("Varsler er aktivert på denne enheten.");
     } catch (error) {
       setMelding(error.message || "Kunne ikke aktivere varsler.");
     } finally {
@@ -2089,9 +2089,9 @@ function TeacherPushSection() {
     try {
       await unsubscribeTeacherPush();
       setAktiv(false);
-      setMelding("Varsler er slÃ¥tt av pÃ¥ denne enheten.");
+      setMelding("Varsler er slått av på denne enheten.");
     } catch (error) {
-      setMelding(error.message || "Kunne ikke slÃ¥ av varsler.");
+      setMelding(error.message || "Kunne ikke slå av varsler.");
     } finally {
       setJobber(false);
     }
@@ -2104,20 +2104,20 @@ function TeacherPushSection() {
           {aktiv ? <Bell size={22} /> : <BellOff size={22} />}
         </div>
         <div>
-          <p className="portal-eyebrow">LÃ¦rer</p>
+          <p className="portal-eyebrow">Lærer</p>
           <h2>Pushvarsler</h2>
-          <p className="muted-text">FÃ¥ varsel pÃ¥ mobilen nÃ¥r en elev legger seg i hÃ¥ndsopprekkingskÃ¸.</p>
+          <p className="muted-text">Få varsel på mobilen når en elev legger seg i håndsopprekkingskø.</p>
         </div>
       </div>
 
       {stotte === "nei" ? (
-        <div className="queue-error">Denne nettleseren stÃ¸tter ikke pushvarsler.</div>
+        <div className="queue-error">Denne nettleseren støtter ikke pushvarsler.</div>
       ) : (
         <div className="teacher-actions">
           {aktiv ? (
             <button type="button" className="danger-button" onClick={handleDeaktiver} disabled={jobber}>
               <BellOff size={18} />
-              SlÃ¥ av varsler
+              Slå av varsler
             </button>
           ) : (
             <button type="button" className="primary-button compact-button" onClick={handleAktiver} disabled={jobber}>

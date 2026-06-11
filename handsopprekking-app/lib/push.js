@@ -1,5 +1,5 @@
 import webPush from "web-push";
-import { readPushSubscriptions, writePushSubscriptions } from "./_queueStore.js";
+import { readPushSubscriptions, writePushSubscriptions } from "./store.js";
 
 export function getVapidPublicKey() {
   return process.env.VAPID_PUBLIC_KEY || "";

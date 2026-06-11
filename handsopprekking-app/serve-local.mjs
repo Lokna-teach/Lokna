@@ -418,6 +418,29 @@ createServer(async (request, response) => {
       return;
     }
 
+    if (request.method === "POST" && url.pathname === "/api/teacher/push") {
+      if (!isTeacherAuthorized(request)) {
+        sendJson(response, 401, { message: "Ikke innlogget som lærer." });
+        return;
+      }
+
+      const body = await getRequestBody(request);
+      if (body.action === "subscribe") {
+        addPushSubscription(body.subscription);
+        sendJson(response, 201, { ok: true, count: pushSubscriptions.length });
+        return;
+      }
+
+      if (body.action === "unsubscribe") {
+        pushSubscriptions = pushSubscriptions.filter((subscription) => subscription.endpoint !== body.endpoint);
+        sendJson(response, 200, { ok: true, count: pushSubscriptions.length });
+        return;
+      }
+
+      sendJson(response, 400, { message: "Ukjent push-handling." });
+      return;
+    }
+
     if (request.method === "POST" && url.pathname === "/api/teacher/push/subscribe") {
       if (!isTeacherAuthorized(request)) {
         sendJson(response, 401, { message: "Ikke innlogget som lÃ¦rer." });
