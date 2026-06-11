@@ -5,6 +5,7 @@ import {
   BellOff,
   Cable,
   Calculator,
+  CheckCircle2,
   ChevronDown,
   ClipboardCheck,
   Eye,
@@ -22,6 +23,7 @@ import {
   ShieldCheck,
   Wrench,
   Users,
+  XCircle,
 } from "lucide-react";
 import {
   BarRow,
