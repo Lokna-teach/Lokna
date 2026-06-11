@@ -1251,6 +1251,201 @@ function KabelOgVernPage() {
   );
 }
 
+function KabelOgVernScratchPage() {
+  const [kurs, setKurs] = useState("");
+  const [ib, setIb] = useState("");
+  const [sikring, setSikring] = useState("");
+  const [karakteristikk, setKarakteristikk] = useState("B");
+  const [i2Faktor, setI2Faktor] = useState("1,45");
+  const [tverrsnitt, setTverrsnitt] = useState("2,5");
+  const [installasjonstype, setInstallasjonstype] = useState("Industri / næring");
+  const [izAvlest, setIzAvlest] = useState("");
+  const [izSvar, setIzSvar] = useState("");
+  const [kt, setKt] = useState("1");
+  const [kn, setKn] = useState("1");
+  const [tabell62gKontrollert, setTabell62gKontrollert] = useState(false);
+
+  const resultat = useMemo(
+    () =>
+      beregnKabelResultat({
+        ib,
+        sikring,
+        karakteristikk,
+        i2Faktor,
+        izAvlest,
+        izManuell: izSvar,
+        kt,
+        kn,
+        installasjonstype,
+        tverrsnitt,
+        tabell62gKontrollert,
+      }),
+    [ib, sikring, karakteristikk, i2Faktor, izAvlest, izSvar, kt, kn, installasjonstype, tverrsnitt, tabell62gKontrollert]
+  );
+
+  const manglerVerdier = !hasValue(ib) || !hasValue(sikring) || !hasValue(izAvlest);
+  const konklusjon = manglerVerdier ? "Verdier mangler" : resultat.samletOk ? "Godkjent" : "Ikke godkjent";
+  const krav1Formel = resultat.brukerBoligLavtRegelsett ? "IB ≤ IN" : "IB ≤ IN ≤ IZ";
+  const krav1Verdier = resultat.brukerBoligLavtRegelsett
+    ? `${formatAmpere(ib)} ≤ ${formatWholeAmpereOrZero(sikring)}`
+    : `${formatAmpere(ib)} ≤ ${formatWholeAmpereOrZero(sikring)} ≤ ${formatAmpere(resultat.iz)}`;
+  const krav2Formel = resultat.brukerBoligLavtRegelsett ? "I2 ≤ IZ" : "I2 ≤ 1,45 × IZ";
+  const krav2Verdier = resultat.brukerBoligLavtRegelsett
+    ? `${formatAmpere(resultat.i2)} ≤ ${formatAmpere(resultat.iz)}`
+    : `${formatAmpere(resultat.i2)} ≤ ${formatAmpere(1.45 * resultat.iz)}`;
+
+  function startPaNy() {
+    setKurs("");
+    setIb("");
+    setSikring("");
+    setKarakteristikk("B");
+    setI2Faktor("1,45");
+    setTverrsnitt("2,5");
+    setInstallasjonstype("Industri / næring");
+    setIzAvlest("");
+    setIzSvar("");
+    setKt("1");
+    setKn("1");
+    setTabell62gKontrollert(false);
+  }
+
+  return (
+    <section className="page">
+      <header className="hero">
+        <div>
+          <p className="portal-eyebrow">Beregning</p>
+          <h1>6.2.5 Kabel og vern</h1>
+          <p>Stegvis kontroll av kabel, vern og strømføringsevne. Kun for undervisning.</p>
+        </div>
+        <div className={`calculation-result ${manglerVerdier ? "missing" : resultat.samletOk ? "approved" : "rejected"}`}>
+          <span>Konklusjon</span>
+          <strong>{konklusjon}</strong>
+        </div>
+      </header>
+
+      <div className="calculation-layout">
+        <section className="card">
+          <div className="section-heading">
+            <div className="section-icon">
+              <Cable size={22} />
+            </div>
+            <div>
+              <h2>Kabelberegning steg for steg</h2>
+              <p className="muted-text">Fyll inn verdiene fra oppgaven og kontroller kravene.</p>
+            </div>
+          </div>
+
+          <div className="form">
+            <label className="field">
+              <span>Kurs til</span>
+              <input value={kurs} onChange={(event) => setKurs(event.target.value)} placeholder="Eks. stikkontakter stue" />
+            </label>
+
+            <StepCard number="1" title="Beregn belastningsstrømmen IB">
+              <NumberInput label="IB - belastningsstrøm" value={ib} onChange={setIb} suffix="A" />
+            </StepCard>
+
+            <StepCard number="2" title="Velg vern">
+              <div className="two-column">
+                <SelectInput label="IN - sikringsstørrelse" value={sikring} onChange={setSikring}>
+                  <option value="">Velg sikring</option>
+                  {sikringsStorrelser.map((amp) => (
+                    <option key={amp} value={amp}>{amp} A</option>
+                  ))}
+                </SelectInput>
+                <SelectInput label="Utløsekarakteristikk" value={karakteristikk} onChange={setKarakteristikk} helper={resultat.valgtKarakteristikk.forklaring}>
+                  {Object.keys(sikringsKarakteristikker).map((key) => (
+                    <option key={key} value={key}>{key}</option>
+                  ))}
+                </SelectInput>
+              </div>
+            </StepCard>
+
+            <StepCard number="3" title="Kabel og forutsetninger">
+              <div className="three-column">
+                <SelectInput label="Tverrsnitt" value={tverrsnitt} onChange={setTverrsnitt}>
+                  <option>1,5</option>
+                  <option>2,5</option>
+                  <option>4</option>
+                  <option>6</option>
+                  <option>10</option>
+                  <option>16</option>
+                  <option>25</option>
+                </SelectInput>
+                <SelectInput label="Forlegningsmåte" value={forlegningsmater[0]} onChange={() => {}}>
+                  {forlegningsmater.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </SelectInput>
+                <SelectInput label="Installasjonstype" value={installasjonstype} onChange={setInstallasjonstype}>
+                  <option>Industri / næring</option>
+                  <option>Bolig / landbruk / hagebruk</option>
+                </SelectInput>
+              </div>
+            </StepCard>
+
+            <StepCard number="4" title="Korreksjonsfaktor">
+              <div className="two-column">
+                <NumberInput label="Kt - temperatur" value={kt} onChange={setKt} />
+                <NumberInput label="Kn - nærføring" value={kn} onChange={setKn} />
+              </div>
+            </StepCard>
+
+            <StepCard number="5" title="Strømføringsevne">
+              <div className="two-column">
+                <NumberInput label="IZ avlest" value={izAvlest} onChange={setIzAvlest} suffix="A" />
+                <NumberInput label="IZ manuelt kontrollert" value={izSvar} onChange={setIzSvar} suffix="A" />
+              </div>
+              <p className="helper">IZ beregnet: {formatAmpere(resultat.izBeregnet)}. Manuelt kontrollert IZ brukes hvis feltet er fylt ut.</p>
+            </StepCard>
+
+            <StepCard number="6" title="Kontroller krav 1 og 2">
+              <NumberInput label="I2-faktor" value={i2Faktor} onChange={setI2Faktor} />
+              {resultat.kreverTabell62g && (
+                <label className={`checkbox-row single-check ${tabell62gKontrollert ? "checked" : ""}`}>
+                  <input checked={tabell62gKontrollert} type="checkbox" onChange={(event) => setTabell62gKontrollert(event.target.checked)} />
+                  <span>Tabell 6.2g er kontrollert for industri / næring med tverrsnitt opp til og med 4 mm².</span>
+                </label>
+              )}
+              <div className="status-stack">
+                <StatusLine ok={!manglerVerdier} title="IZmin" text={`IZmin = IN / (Kt × Kn) = ${formatAmpere(resultat.izmin)}`} />
+                <StatusLine ok={resultat.krav1Ok} title="Krav 1" labels={krav1Formel} values={krav1Verdier} />
+                <StatusLine ok={resultat.krav2Ok} title="Krav 2" labels={krav2Formel} values={krav2Verdier} />
+                {resultat.kreverTabell62g && <StatusLine ok={resultat.tabell62gOk} title="Tabell 6.2g" text="Må være kontrollert for valgt forutsetning." />}
+              </div>
+            </StepCard>
+
+            <button type="button" className="danger-button" onClick={startPaNy}>
+              <RotateCcw size={18} />
+              Start på ny
+            </button>
+          </div>
+        </section>
+
+        <aside className="queue-panel calculation-report">
+          <div className="queue-panel-header">
+            <div>
+              <p className="portal-eyebrow">Rapport</p>
+              <h2>{kurs || "Kurs ikke valgt"}</h2>
+              <p className="muted-text">{resultat.valgtKarakteristikk.forklaring}</p>
+            </div>
+          </div>
+
+          <div className="summary">
+            <p className="summary-course">Konklusjon: {konklusjon}</p>
+            <div className="summary-step"><p>1. IB</p><p>Belastningsstrøm = {formatAmpereOrBlank(ib)}</p></div>
+            <div className="summary-step"><p>2. Vern</p><p>IN = {formatWholeAmpere(sikring)}</p><p>Karakteristikk = {karakteristikk}</p></div>
+            <div className="summary-step"><p>3. Kabel</p><p>Tverrsnitt = {hasValue(tverrsnitt) ? `${tverrsnitt} mm²` : ""}</p><p>Installasjonstype = {installasjonstype}</p></div>
+            <div className="summary-step"><p>4. Korreksjon</p><p>Kt = {formatDecimalOrBlank(kt)}</p><p>Kn = {formatDecimalOrBlank(kn)}</p></div>
+            <div className="summary-step"><p>5. IZ</p><p>IZ avlest = {formatAmpereOrBlank(izAvlest)}</p><p>IZ brukt = {formatAmpere(hasValue(izSvar) ? izSvar : resultat.izBeregnet)}</p></div>
+            <div className="summary-step"><p>6. Krav</p><p>{krav1Formel}: {krav1Verdier}</p><p>{krav2Formel}: {krav2Verdier}</p><p>I2 = {formatAmpere(resultat.i2)}</p><p>I5 = {formatAmpere(resultat.i5)}</p></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function KabelOgVernOriginalPage() {
   const [kurs, setKurs] = useState("");
   const [ib, setIb] = useState("");
@@ -1701,7 +1896,7 @@ class CalculationErrorBoundary extends React.Component {
 function BeregningPage({ aktivSide }) {
   return (
     <CalculationErrorBoundary key={aktivSide}>
-      {aktivSide === "beregning-kabel" ? <KabelOgVernPage /> : <ComingSoonCalculation type={aktivSide} />}
+      {aktivSide === "beregning-kabel" ? <KabelOgVernScratchPage /> : <ComingSoonCalculation type={aktivSide} />}
     </CalculationErrorBoundary>
   );
 }
