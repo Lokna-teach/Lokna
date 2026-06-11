@@ -1446,6 +1446,219 @@ function KabelOgVernScratchPage() {
   );
 }
 
+function KabelOgVernSafePage() {
+  const [kurs, setKurs] = useState("");
+  const [ib, setIb] = useState("");
+  const [sikring, setSikring] = useState("");
+  const [karakteristikk, setKarakteristikk] = useState("B");
+  const [kt, setKt] = useState("1");
+  const [kn, setKn] = useState("1");
+  const [izAvlest, setIzAvlest] = useState("");
+  const [izManuell, setIzManuell] = useState("");
+  const [i2Faktor, setI2Faktor] = useState("1,45");
+  const [tverrsnitt, setTverrsnitt] = useState("2,5");
+  const [installasjonstype, setInstallasjonstype] = useState("Industri / næring");
+  const [tabell62gKontrollert, setTabell62gKontrollert] = useState(false);
+
+  const toNumber = (value, fallback = 0) => {
+    const parsed = Number(String(value ?? "").replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const amp = (value) => `${toNumber(value).toFixed(2).replace(".", ",")} A`;
+  const blankAmp = (value) => (String(value ?? "").trim() ? amp(value) : "");
+  const decimal = (value) => (String(value ?? "").trim() ? toNumber(value).toFixed(2).replace(".", ",") : "");
+
+  const ibTall = toNumber(ib);
+  const inTall = toNumber(sikring);
+  const ktTall = toNumber(kt, 1) || 1;
+  const knTall = toNumber(kn, 1) || 1;
+  const izAvlestTall = toNumber(izAvlest);
+  const izBeregnet = izAvlestTall * ktTall * knTall;
+  const izBrukt = String(izManuell).trim() ? toNumber(izManuell) : izBeregnet;
+  const i2 = inTall * toNumber(i2Faktor);
+  const karakter = sikringsKarakteristikker[karakteristikk] || sikringsKarakteristikker.B;
+  const i5 = inTall * karakter.i5;
+  const erBoligLavt = installasjonstype === "Bolig / landbruk / hagebruk" && toNumber(tverrsnitt) <= 4;
+  const kreverTabell62g = installasjonstype === "Industri / næring" && toNumber(tverrsnitt) <= 4;
+  const krav1Ok = erBoligLavt ? ibTall <= inTall : ibTall <= inTall && inTall <= izBrukt;
+  const krav2Ok = erBoligLavt ? i2 <= izBrukt : i2 <= 1.45 * izBrukt;
+  const tabellOk = !kreverTabell62g || tabell62gKontrollert;
+  const mangler = !String(ib).trim() || !String(sikring).trim() || !String(izAvlest).trim();
+  const samletOk = !mangler && krav1Ok && krav2Ok && tabellOk;
+  const konklusjon = mangler ? "Verdier mangler" : samletOk ? "Godkjent" : "Ikke godkjent";
+
+  function reset() {
+    setKurs("");
+    setIb("");
+    setSikring("");
+    setKarakteristikk("B");
+    setKt("1");
+    setKn("1");
+    setIzAvlest("");
+    setIzManuell("");
+    setI2Faktor("1,45");
+    setTverrsnitt("2,5");
+    setInstallasjonstype("Industri / næring");
+    setTabell62gKontrollert(false);
+  }
+
+  const TextField = ({ label, value, onChange, suffix }) => (
+    <label className="field">
+      <span>{label}</span>
+      <div className="input-shell">
+        <input inputMode="decimal" value={value} onChange={(event) => onChange(event.target.value)} />
+        {suffix && <small>{suffix}</small>}
+      </div>
+    </label>
+  );
+
+  const ChoiceField = ({ label, value, onChange, children }) => (
+    <label className="field">
+      <span>{label}</span>
+      <select value={value} onChange={(event) => onChange(event.target.value)}>
+        {children}
+      </select>
+    </label>
+  );
+
+  const CheckLine = ({ ok, title, children }) => (
+    <div className={`status-line ${ok ? "status-ok" : "status-error"}`}>
+      {ok ? <CheckCircle2 size={22} /> : <XCircle size={22} />}
+      <div>
+        <strong>{title}</strong>
+        <p>{children}</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <section className="page">
+      <header className="hero">
+        <div>
+          <p className="portal-eyebrow">Beregning</p>
+          <h1>6.2.5 Kabel og vern</h1>
+          <p>Kontroller at kabel og vern passer sammen. Kun for undervisning.</p>
+        </div>
+        <div className={`calculation-result ${mangler ? "missing" : samletOk ? "approved" : "rejected"}`}>
+          <span>Konklusjon</span>
+          <strong>{konklusjon}</strong>
+        </div>
+      </header>
+
+      <div className="calculation-layout">
+        <section className="card">
+          <div className="section-heading">
+            <div className="section-icon">
+              <Cable size={22} />
+            </div>
+            <div>
+              <h2>Kabelberegning</h2>
+              <p className="muted-text">Fyll inn verdiene steg for steg.</p>
+            </div>
+          </div>
+
+          <div className="form">
+            <label className="field">
+              <span>Kurs til</span>
+              <input value={kurs} onChange={(event) => setKurs(event.target.value)} placeholder="Eks. stikkontakter stue" />
+            </label>
+
+            <div className="two-column">
+              <TextField label="IB - belastningsstrøm" value={ib} onChange={setIb} suffix="A" />
+              <ChoiceField label="IN - sikringsstørrelse" value={sikring} onChange={setSikring}>
+                <option value="">Velg sikring</option>
+                {sikringsStorrelser.map((ampere) => (
+                  <option key={ampere} value={ampere}>{ampere} A</option>
+                ))}
+              </ChoiceField>
+            </div>
+
+            <div className="three-column">
+              <ChoiceField label="Karakteristikk" value={karakteristikk} onChange={setKarakteristikk}>
+                {Object.keys(sikringsKarakteristikker).map((key) => (
+                  <option key={key} value={key}>{key}</option>
+                ))}
+              </ChoiceField>
+              <TextField label="Kt temperatur" value={kt} onChange={setKt} />
+              <TextField label="Kn nærføring" value={kn} onChange={setKn} />
+            </div>
+
+            <div className="three-column">
+              <ChoiceField label="Tverrsnitt" value={tverrsnitt} onChange={setTverrsnitt}>
+                <option>1,5</option>
+                <option>2,5</option>
+                <option>4</option>
+                <option>6</option>
+                <option>10</option>
+                <option>16</option>
+                <option>25</option>
+              </ChoiceField>
+              <ChoiceField label="Installasjonstype" value={installasjonstype} onChange={setInstallasjonstype}>
+                <option>Industri / næring</option>
+                <option>Bolig / landbruk / hagebruk</option>
+              </ChoiceField>
+              <TextField label="I2-faktor" value={i2Faktor} onChange={setI2Faktor} />
+            </div>
+
+            <div className="two-column">
+              <TextField label="IZ avlest" value={izAvlest} onChange={setIzAvlest} suffix="A" />
+              <TextField label="IZ manuelt kontrollert" value={izManuell} onChange={setIzManuell} suffix="A" />
+            </div>
+
+            {kreverTabell62g && (
+              <label className={`checkbox-row single-check ${tabell62gKontrollert ? "checked" : ""}`}>
+                <input checked={tabell62gKontrollert} type="checkbox" onChange={(event) => setTabell62gKontrollert(event.target.checked)} />
+                <span>Tabell 6.2g er kontrollert.</span>
+              </label>
+            )}
+
+            <button type="button" className="danger-button" onClick={reset}>
+              <RotateCcw size={18} />
+              Start på ny
+            </button>
+          </div>
+        </section>
+
+        <aside className="queue-panel calculation-report">
+          <div className="queue-panel-header">
+            <div>
+              <p className="portal-eyebrow">Rapport</p>
+              <h2>{kurs || "Kurs ikke valgt"}</h2>
+              <p className="muted-text">{karakter.forklaring}</p>
+            </div>
+          </div>
+
+          <div className="status-stack">
+            <CheckLine ok={!mangler} title="Verdier">
+              Fyll inn minst IB, IN og IZ avlest.
+            </CheckLine>
+            <CheckLine ok={krav1Ok} title="Krav 1">
+              {erBoligLavt ? "IB ≤ IN" : "IB ≤ IN ≤ IZ"}: {amp(ibTall)} ≤ {amp(inTall)}{erBoligLavt ? "" : ` ≤ ${amp(izBrukt)}`}
+            </CheckLine>
+            <CheckLine ok={krav2Ok} title="Krav 2">
+              {erBoligLavt ? "I2 ≤ IZ" : "I2 ≤ 1,45 × IZ"}: {amp(i2)} ≤ {amp(erBoligLavt ? izBrukt : 1.45 * izBrukt)}
+            </CheckLine>
+            {kreverTabell62g && (
+              <CheckLine ok={tabellOk} title="Tabell 6.2g">
+                Må være kontrollert for industri / næring med tverrsnitt opp til og med 4 mm².
+              </CheckLine>
+            )}
+          </div>
+
+          <div className="summary">
+            <p className="summary-course">Konklusjon: {konklusjon}</p>
+            <div className="summary-step"><p>IB</p><p>{blankAmp(ib)}</p></div>
+            <div className="summary-step"><p>IN</p><p>{blankAmp(sikring)}</p><p>Karakteristikk {karakteristikk}</p></div>
+            <div className="summary-step"><p>Korreksjon</p><p>Kt = {decimal(kt)}</p><p>Kn = {decimal(kn)}</p></div>
+            <div className="summary-step"><p>IZ</p><p>Avlest = {blankAmp(izAvlest)}</p><p>Beregnet = {amp(izBeregnet)}</p><p>Brukt = {amp(izBrukt)}</p></div>
+            <div className="summary-step"><p>I2 / I5</p><p>I2 = {amp(i2)}</p><p>I5 = {amp(i5)}</p></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  );
+}
+
 function KabelOgVernOriginalPage() {
   const [kurs, setKurs] = useState("");
   const [ib, setIb] = useState("");
@@ -1896,7 +2109,7 @@ class CalculationErrorBoundary extends React.Component {
 function BeregningPage({ aktivSide }) {
   return (
     <CalculationErrorBoundary key={aktivSide}>
-      {aktivSide === "beregning-kabel" ? <KabelOgVernScratchPage /> : <ComingSoonCalculation type={aktivSide} />}
+      {aktivSide === "beregning-kabel" ? <KabelOgVernSafePage /> : <ComingSoonCalculation type={aktivSide} />}
     </CalculationErrorBoundary>
   );
 }
